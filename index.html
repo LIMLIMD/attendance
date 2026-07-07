@@ -56,6 +56,8 @@
   select.leave-input{width:82px;}
   input.time-input{width:78px;}
   input.time-input.invalid{border-color:var(--minus);background:#FFE1E1;}
+  input.time-input.live-preview{background:#D6EEF8;color:#98a3ab;border-color:#B9DCEB;}
+  input.time-input.live-preview:hover{background:#c9e6f4;}
   select.leave-input:hover, input.time-input:hover{background:var(--input-bg-hover);}
   select.leave-input:focus, input.time-input:focus{outline:2px solid var(--accent);outline-offset:1px;}
 
@@ -162,6 +164,20 @@
   }
   function planMinutes(dow){ return (dow>=1 && dow<=5) ? 480 : 0; }
 
+  function nowTimeStr(){
+    const n = new Date();
+    return pad(n.getHours()) + ':' + pad(n.getMinutes());
+  }
+
+  // 출근은 입력됐지만 퇴근이 비어있으면, 지금 이 순간의 시각을 임시 퇴근시간으로
+  // 사용해서 계산에 반영한다 (실제로 저장되는 값은 아니고 화면 표시/계산용).
+  function effectiveDayData(data){
+    if(data.checkIn && !data.checkOut){
+      return { leave: data.leave, checkIn: data.checkIn, checkOut: nowTimeStr(), _live: true };
+    }
+    return data;
+  }
+
   // ---------------- Auth (이름 + 4자리 PIN, Supabase 테이블 기반) ----------------
 
   function loadSession(){
@@ -258,6 +274,15 @@
   }
 
   let flashTimer=null;
+  let liveTick=null;
+  function startLiveTick(){
+    if(liveTick) return;
+    liveTick = setInterval(()=>{
+      const active = document.activeElement;
+      if(active && (active.tagName === 'INPUT' || active.tagName === 'SELECT')) return; // 입력 중이면 건드리지 않음
+      render();
+    }, 30000);
+  }
   function flashSave(){
     const el = document.getElementById('save-flag');
     if(!el) return;
@@ -435,6 +460,7 @@
   // ---------------- 렌더링: 메인 앱 ----------------
 
   function renderApp(){
+    startLiveTick();
     const y = state.year, m = state.month;
     const nDays = daysInMonth(y,m);
     const rows = [];
@@ -445,8 +471,10 @@
       const dstr = dateKey(y,m,d);
       const dow = new Date(y, m-1, d).getDay();
       const data = getDayData(dstr);
+      const effData = effectiveDayData(data);
+      const isLive = !!effData._live;
       const famDay = isFamilyDay(y, m, d);
-      const c = computeDay(dow, data, famDay);
+      const c = computeDay(dow, effData, famDay);
       if(c.statusCounts) cumulative += c.dailyDiff;
       totals.plan += c.plan;
       totals.dur += (c.dur||0);
@@ -469,7 +497,7 @@
           </td>
           <td class="mono">${c.plan>0 ? minToStr(c.plan) : '<span class="muted">-</span>'}</td>
           <td><input class="time-input" type="text" inputmode="numeric" placeholder="09:00" maxlength="5" data-field="checkIn" data-date="${dstr}" value="${data.checkIn||''}"></td>
-          <td><input class="time-input" type="text" inputmode="numeric" placeholder="18:00" maxlength="5" data-field="checkOut" data-date="${dstr}" value="${data.checkOut||''}"></td>
+          <td><input class="time-input${isLive ? ' live-preview' : ''}" type="text" inputmode="numeric" placeholder="18:00" maxlength="5" data-field="checkOut" data-date="${dstr}" value="${isLive ? effData.checkOut : (data.checkOut||'')}"></td>
           <td class="mono">${c.dur!=null ? minToStr(c.dur) : ''}</td>
           <td class="mono">${c.dur!=null ? minToStr(c.lunch) : ''}</td>
           <td class="mono">${c.dur!=null ? minToStr(c.dinner) : ''}</td>
@@ -487,7 +515,7 @@
     for(let d=1; d<=nDays; d++){
       const dstr2 = dateKey(y,m,d);
       const dow2 = new Date(y, m-1, d).getDay();
-      const dd = computeDay(dow2, getDayData(dstr2), isFamilyDay(y,m,d));
+      const dd = computeDay(dow2, effectiveDayData(getDayData(dstr2)), isFamilyDay(y,m,d));
       if(dd.dinner>0) dinnerDaysCount++;
     }
     const mealTotal = dinnerDaysCount * MEAL_RATE;
@@ -607,12 +635,14 @@
     };
 
     document.querySelectorAll('input.time-input').forEach(el=>{
+      el.addEventListener('focus', ()=>{ el.select(); });
       el.addEventListener('input', ()=>{
         let v = el.value.replace(/[^0-9]/g,'');
         if(v.length>4) v = v.slice(0,4);
         if(v.length>=3) v = v.slice(0,2)+':'+v.slice(2);
         el.value = v;
         el.classList.remove('invalid');
+        el.classList.remove('live-preview');
       });
     });
 
