@@ -139,9 +139,10 @@
     month: 7,
     days: {},
     user: null,   // { id, name }
-    authView: 'login', // 'login' | 'signup'
+    authView: 'login', // 'login' | 'signup' | 'changepin'
     loginError: '',
-    signupError: ''
+    signupError: '',
+    changePinError: ''
   };
 
   const todayObj = new Date();
@@ -230,6 +231,30 @@
       .from('att_users').insert({ name, pin }).select('id,name').single();
     if(insErr) return { ok:false, message:'계정 생성에 실패했어요. 잠시 후 다시 시도해주세요.' };
     return { ok:true, user:{ id: created.id, name: created.name } };
+  }
+
+  async function changePin(name, oldPin, newPin, newPinConfirm){
+    if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요. 코드 상단의 SUPABASE_URL / SUPABASE_ANON_KEY를 채워주세요.' };
+    if(!name){ return { ok:false, message:'이름을 입력해주세요.' }; }
+    if(!/^\d{4}$/.test(oldPin)){ return { ok:false, message:'기존 PIN은 숫자 4자리로 입력해주세요.' }; }
+    if(!/^\d{4}$/.test(newPin)){ return { ok:false, message:'변경할 PIN은 숫자 4자리로 입력해주세요.' }; }
+    if(newPin !== newPinConfirm){ return { ok:false, message:'변경할 PIN이 서로 일치하지 않아요. 다시 확인해주세요.' }; }
+    if(oldPin === newPin){ return { ok:false, message:'기존 PIN과 다른 값으로 설정해주세요.' }; }
+
+    const { data: existing, error } = await supabase
+      .from('att_users').select('id,pin').eq('name', name).limit(1);
+    if(error) return { ok:false, message:'서버 연결에 실패했어요. 잠시 후 다시 시도해주세요.' };
+    if(!existing || existing.length === 0){
+      return { ok:false, message:'등록되지 않은 이름이에요.' };
+    }
+    const row = existing[0];
+    if(row.pin !== oldPin){
+      return { ok:false, message:'기존 PIN이 올바르지 않아요.' };
+    }
+
+    const { error: updErr } = await supabase.from('att_users').update({ pin: newPin }).eq('id', row.id);
+    if(updErr) return { ok:false, message:'PIN 변경에 실패했어요. 잠시 후 다시 시도해주세요.' };
+    return { ok:true, user:{ id: row.id, name } };
   }
 
   function logout(){
@@ -351,6 +376,7 @@
           <button id="loginBtn" class="login-btn">로그인</button>
           <div id="loginError" class="login-error">${state.loginError || ''}</div>
           <div class="login-switch">계정이 없으신가요? <a href="#" id="goSignup">회원가입</a></div>
+          <div class="login-switch">PIN을 바꾸고 싶으신가요? <a href="#" id="goChangePin">PIN 변경</a></div>
           <div class="login-hint">${supabase ? '' : '⚠ 코드 상단의 SUPABASE_URL / SUPABASE_ANON_KEY를 먼저 채워주세요.'}</div>
         </div>
       </div>
@@ -388,6 +414,12 @@
       e.preventDefault();
       state.authView = 'signup';
       state.signupError = '';
+      render();
+    });
+    document.getElementById('goChangePin').addEventListener('click', (e)=>{
+      e.preventDefault();
+      state.authView = 'changepin';
+      state.changePinError = '';
       render();
     });
   }
@@ -450,6 +482,81 @@
       el.addEventListener('keydown', e=>{ if(e.key==='Enter') doSignup(); });
     });
     document.getElementById('goLogin').addEventListener('click', (e)=>{
+      e.preventDefault();
+      state.authView = 'login';
+      state.loginError = '';
+      render();
+    });
+  }
+
+  function renderChangePin(){
+    document.getElementById('app').innerHTML = `
+      <div class="login-wrap">
+        <div class="login-card">
+          <h1>PIN 변경</h1>
+          <div class="desc">이름과 기존 PIN을 확인한 뒤, 새 PIN을 두 번 입력해주세요.</div>
+          <div class="login-field">
+            <label>이름</label>
+            <input id="cpName" type="text" placeholder="홍길동" maxlength="20">
+          </div>
+          <div class="login-field">
+            <label>기존 PIN (숫자 4자리)</label>
+            <input id="cpOldPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••">
+          </div>
+          <div class="login-field">
+            <label>변경 PIN (숫자 4자리)</label>
+            <input id="cpNewPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••">
+          </div>
+          <div class="login-field">
+            <label>변경 PIN 확인</label>
+            <input id="cpNewPinConfirm" type="password" inputmode="numeric" maxlength="4" placeholder="••••">
+          </div>
+          <button id="changePinBtn" class="login-btn">PIN 변경</button>
+          <div id="changePinError" class="login-error">${state.changePinError || ''}</div>
+          <div class="login-switch">생각이 바뀌셨나요? <a href="#" id="goLoginFromChangePin">로그인으로 돌아가기</a></div>
+          <div class="login-hint">${supabase ? '' : '⚠ 코드 상단의 SUPABASE_URL / SUPABASE_ANON_KEY를 먼저 채워주세요.'}</div>
+        </div>
+      </div>
+    `;
+    const nameEl = document.getElementById('cpName');
+    const oldPinEl = document.getElementById('cpOldPin');
+    const newPinEl = document.getElementById('cpNewPin');
+    const newPinConfirmEl = document.getElementById('cpNewPinConfirm');
+    const btn = document.getElementById('changePinBtn');
+
+    [oldPinEl, newPinEl, newPinConfirmEl].forEach(el=>{
+      el.addEventListener('input', ()=>{
+        el.value = el.value.replace(/[^0-9]/g,'').slice(0,4);
+      });
+    });
+
+    async function doChangePin(){
+      btn.disabled = true;
+      btn.textContent = '변경 중...';
+      const res = await changePin(
+        nameEl.value.trim(),
+        oldPinEl.value.trim(),
+        newPinEl.value.trim(),
+        newPinConfirmEl.value.trim()
+      );
+      if(res.ok){
+        state.user = res.user;
+        state.changePinError = '';
+        saveSession(res.user);
+        await loadMonth();
+        render();
+      } else {
+        state.changePinError = res.message;
+        btn.disabled = false;
+        btn.textContent = 'PIN 변경';
+        render();
+      }
+    }
+    btn.addEventListener('click', doChangePin);
+    [nameEl, oldPinEl, newPinEl, newPinConfirmEl].forEach(el=>{
+      el.addEventListener('keydown', e=>{ if(e.key==='Enter') doChangePin(); });
+    });
+    document.getElementById('goLoginFromChangePin').addEventListener('click', (e)=>{
       e.preventDefault();
       state.authView = 'login';
       state.loginError = '';
@@ -612,6 +719,7 @@
   function render(){
     if(!state.user){
       if(state.authView === 'signup') renderSignup();
+      else if(state.authView === 'changepin') renderChangePin();
       else renderLogin();
       return;
     }
