@@ -44,6 +44,9 @@
   .top-grid{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start;}
   @media(max-width:900px){.top-grid{grid-template-columns:1fr;}}
 
+  .todo-grid{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start;}
+  @media(max-width:900px){.todo-grid{grid-template-columns:1fr;}}
+
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
   .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#7a8389;margin:0 0 10px 0;font-weight:700;}
 
@@ -136,17 +139,27 @@
   .task-actions button:hover{background:#e2e8e6;}
   .task-actions button.danger:hover{background:#FFE1E1;color:var(--minus);}
 
-  .todo-row{display:grid;grid-template-columns:34px 132px 1fr 30px;gap:8px;align-items:center;padding:7px 2px;border-bottom:1px solid #EEF1F0;}
-  .todo-row:last-child{border-bottom:none;}
-  .todo-row input[type=date]{border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:12px;width:100%;color:var(--ink);}
-  .todo-row input[type=text]{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;width:100%;}
-  .todo-row input[type=text]:focus, .todo-row input[type=date]:focus{outline:2px solid var(--accent);outline-offset:1px;}
-  .todo-row input.todo-content-edit.done{text-decoration:line-through;color:#b7bec2;}
-  .todo-empty{font-size:12.5px;color:#8b9298;padding:10px 2px;}
-  .todo-delete{border:none;background:none;color:#c7cdcb;font-size:16px;cursor:pointer;width:28px;height:28px;border-radius:6px;line-height:1;}
-  .todo-delete:hover{background:#FFE1E1;color:var(--minus);}
+  .todo-legend{font-size:11px;color:#8b9298;margin-bottom:8px;line-height:1.6;}
+  .todo-legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px 0 8px;vertical-align:middle;}
+  .todo-legend .dot.pending{border:1.5px solid #c7cdcb;}
+  .todo-legend .dot.progress{background:var(--amber);}
+  .todo-legend .dot.done{background:var(--accent);}
 
-  .status-toggle{width:26px;height:26px;border-radius:50%;border:2px solid #c7cdcb;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:transparent;padding:0;}
+  .todo-row{display:grid;grid-template-columns:32px 88px 1fr 54px;gap:6px;align-items:center;padding:7px 2px;border-bottom:1px solid #EEF1F0;}
+  .todo-row:last-child{border-bottom:none;}
+  .todo-row input[type=date]{border:1px solid var(--line);border-radius:6px;padding:5px 4px;font-size:11.5px;width:100%;color:var(--ink);}
+  .todo-row input[type=text]{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12.5px;width:100%;}
+  .todo-row input[type=text]:focus, .todo-row input[type=date]:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .todo-due-text{font-size:11px;color:#6b7680;font-family:'IBM Plex Mono',monospace;}
+  .todo-content-text{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .todo-content-text.done{color:#b7bec2;text-decoration:line-through;}
+  .todo-empty{font-size:12.5px;color:#8b9298;padding:10px 2px;}
+  .todo-item-actions{display:flex;gap:2px;justify-content:flex-end;}
+  .todo-icon-btn{border:none;background:none;color:#9aa3a9;cursor:pointer;font-size:13px;width:24px;height:24px;border-radius:5px;line-height:1;}
+  .todo-icon-btn:hover{background:#EEF2F1;color:var(--ink);}
+  .todo-icon-btn.danger:hover{background:#FFE1E1;color:var(--minus);}
+
+  .status-toggle{width:24px;height:24px;border-radius:50%;border:2px solid #c7cdcb;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:transparent;padding:0;flex-shrink:0;}
   .status-toggle.status-in_progress{background:var(--amber);border-color:var(--amber);color:#fff;}
   .status-toggle.status-done{background:var(--accent);border-color:var(--accent);color:#fff;}
 
@@ -154,36 +167,41 @@
   .new-cat-row input{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;}
   .new-cat-row input:focus{outline:2px solid var(--accent);outline-offset:1px;}
 
-  .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:11px;text-align:center;}
-  .mini-cal .dow{color:#8b9298;font-weight:700;padding:3px 0;}
-  .mini-cal .day{padding:6px 0;border-radius:6px;cursor:pointer;position:relative;}
+  .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;font-size:12.5px;text-align:center;}
+  .mini-cal .dow{color:#8b9298;font-weight:700;padding:4px 0;}
+  .mini-cal .day{padding:9px 0;border-radius:7px;cursor:pointer;position:relative;}
   .mini-cal .day:hover{background:var(--accent-soft);}
   .mini-cal .day.selected{background:var(--accent);color:#fff;font-weight:700;}
   .mini-cal .day.today{box-shadow:inset 0 0 0 1.5px var(--accent);}
-  .mini-cal .day.has-event::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--sun);}
+  .mini-cal .day.has-event::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--sun);}
   .mini-cal .day.selected.has-event::after{background:#fff;}
   .mini-cal .day.empty{visibility:hidden;cursor:default;}
 
-  .cal-add-form{display:flex;flex-direction:column;gap:6px;margin:12px 0;padding-top:12px;border-top:1px solid #F0F2F1;}
-  .cal-add-form input{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;width:100%;}
+  .cal-add-form{display:flex;flex-direction:column;gap:8px;margin:14px 0;padding-top:14px;border-top:1px solid #F0F2F1;}
+  .cal-add-form input[type=text], .cal-add-form input[type=datetime-local], .cal-add-form input[type=date]{
+    border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px;width:100%;
+  }
   .cal-add-form input:focus{outline:2px solid var(--accent);outline-offset:1px;}
-  .cal-add-form .row2{display:flex;gap:6px;}
-  .cal-add-form .row2 > div{flex:1;}
-  .cal-add-form label{font-size:10px;color:#7a8389;font-weight:700;display:block;margin-bottom:2px;}
+  .cal-add-form label{font-size:11px;color:#7a8389;font-weight:700;display:block;margin-bottom:3px;}
+  .cal-allday-row{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#54606a;}
+  .cal-allday-row label{margin:0;font-weight:600;color:#54606a;font-size:12.5px;}
 
-  .cal-selected-label{font-size:12px;font-weight:700;color:#54606a;margin:12px 0 6px 0;}
-  .cal-timeline{position:relative;height:960px;overflow-y:auto;max-height:360px;border:1px solid var(--line);border-radius:8px;background:#fff;}
-  .cal-hour-row{position:absolute;left:0;right:0;height:40px;border-top:1px solid #F0F2F1;}
-  .cal-hour-label{position:absolute;left:4px;top:-6px;font-size:9px;color:#b7bec2;background:#fff;padding:0 2px;}
-  .cal-event-bar{position:absolute;left:42px;right:6px;background:var(--accent);color:#fff;border-radius:6px;padding:3px 6px;font-size:10.5px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.15);cursor:pointer;}
-  .cal-event-bar .loc{font-size:9px;opacity:.85;display:block;}
+  .cal-selected-label{font-size:13px;font-weight:700;color:#54606a;margin:14px 0 8px 0;}
+  .cal-allday-section{margin-bottom:10px;}
+  .cal-allday-chip{display:inline-block;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;border-radius:6px;padding:5px 10px;margin:0 6px 6px 0;}
 
-  .cal-event-list{margin-top:10px;}
-  .cal-event-list-item{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:6px 2px;border-bottom:1px solid #EEF1F0;gap:6px;}
+  .cal-timeline{position:relative;height:1200px;overflow-y:auto;max-height:460px;border:1px solid var(--line);border-radius:8px;background:#fff;}
+  .cal-hour-row{position:absolute;left:0;right:0;height:50px;border-top:1px solid #F0F2F1;}
+  .cal-hour-label{position:absolute;left:5px;top:-7px;font-size:10px;color:#b7bec2;background:#fff;padding:0 2px;}
+  .cal-event-bar{position:absolute;left:50px;right:8px;background:var(--accent);color:#fff;border-radius:7px;padding:4px 8px;font-size:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.15);cursor:pointer;}
+  .cal-event-bar .loc{font-size:10.5px;opacity:.85;display:block;}
+
+  .cal-event-list{margin-top:12px;}
+  .cal-event-list-item{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:7px 2px;border-bottom:1px solid #EEF1F0;gap:8px;}
   .cal-event-list-item:last-child{border-bottom:none;}
   .cal-event-list-item .meta{color:#6b7680;flex:1;min-width:0;}
   .cal-event-list-item .meta .t{font-weight:700;color:var(--ink);display:block;}
-  .cal-event-del{border:none;background:none;color:#c7cdcb;cursor:pointer;font-size:15px;flex-shrink:0;}
+  .cal-event-del{border:none;background:none;color:#c7cdcb;cursor:pointer;font-size:16px;flex-shrink:0;}
   .cal-event-del:hover{color:var(--minus);}
 </style>
 </head>
@@ -195,7 +213,6 @@
 
 <script>
 (function(){
-  // ---- Supabase 연결 정보 ----
   const SUPABASE_URL = 'https://tpjxiealovjlmyeqmupq.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_r5uArNLj0P4TBk8rPUnqqQ_hf-T2ZEC';
 
@@ -212,23 +229,11 @@
   const DOW_LABEL = ['일','월','화','수','목','금','토'];
 
   let state = {
-    year: 2026,
-    month: 7,
-    days: {},
-    user: null,
-    authView: 'login',
-    loginError: '',
-    signupError: '',
-    changePinError: '',
+    year: 2026, month: 7, days: {},
+    user: null, authView: 'login', loginError: '', signupError: '', changePinError: '',
     tab: 'attendance',
-    todoCategories: [],
-    todoItems: [],
-    todoActiveCatId: null,
-    todoCatEditing: null,
-    calendarYear: 2026,
-    calendarMonth: 7,
-    calendarSelectedDate: '',
-    calendarEvents: []
+    todoCategories: [], todoItems: [], todoActiveCatId: null, todoCatEditing: null, todoItemEditing: null,
+    calendarYear: 2026, calendarMonth: 7, calendarSelectedDate: '', calendarEvents: []
   };
 
   const todayObj = new Date();
@@ -243,6 +248,9 @@
   function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
   state.calendarSelectedDate = dateKey(state.year, state.month, todayObj.getDate());
 
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
   function timeToMin(t){ if(!t) return null; const p = t.split(':'); if(p.length<2) return null; const h=Number(p[0]), mi=Number(p[1]); if(isNaN(h)||isNaN(mi)) return null; return h*60+mi; }
   function isValidTime24(v){ return /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(v); }
   function minToStr(mins, withSign){
@@ -253,31 +261,17 @@
     return `${sign}${h}:${pad(m)}`;
   }
   function planMinutes(dow){ return (dow>=1 && dow<=5) ? 480 : 0; }
-
-  function nowTimeStr(){
-    const n = new Date();
-    return pad(n.getHours()) + ':' + pad(n.getMinutes());
-  }
+  function nowTimeStr(){ const n = new Date(); return pad(n.getHours()) + ':' + pad(n.getMinutes()); }
   function effectiveDayData(data){
-    if(data.checkIn && !data.checkOut){
-      return { leave: data.leave, checkIn: data.checkIn, checkOut: nowTimeStr(), _live: true };
-    }
+    if(data.checkIn && !data.checkOut){ return { leave: data.leave, checkIn: data.checkIn, checkOut: nowTimeStr(), _live: true }; }
     return data;
   }
 
   // ---------------- Auth ----------------
 
-  function loadSession(){
-    try{ const raw = localStorage.getItem(SESSION_KEY); if(raw) return JSON.parse(raw); }
-    catch(e){ /* ignore */ }
-    return null;
-  }
-  function saveSession(user){
-    try{ localStorage.setItem(SESSION_KEY, JSON.stringify(user)); }catch(e){ /* ignore */ }
-  }
-  function clearSession(){
-    try{ localStorage.removeItem(SESSION_KEY); }catch(e){ /* ignore */ }
-  }
+  function loadSession(){ try{ const raw = localStorage.getItem(SESSION_KEY); if(raw) return JSON.parse(raw); }catch(e){} return null; }
+  function saveSession(user){ try{ localStorage.setItem(SESSION_KEY, JSON.stringify(user)); }catch(e){} }
+  function clearSession(){ try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
 
   async function login(name, pin){
     if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요.' };
@@ -285,11 +279,9 @@
     if(!/^\d{4}$/.test(pin)){ return { ok:false, message:'PIN은 숫자 4자리로 입력해주세요.' }; }
     const { data: existing, error } = await supabase.from('att_users').select('id,name,pin').eq('name', name).limit(1);
     if(error) return { ok:false, message:'서버 연결에 실패했어요. 잠시 후 다시 시도해주세요.' };
-    if(!existing || existing.length === 0){
-      return { ok:false, message:'등록되지 않은 이름이에요. 아래 "회원가입"으로 먼저 계정을 만들어주세요.' };
-    }
+    if(!existing || existing.length === 0) return { ok:false, message:'등록되지 않은 이름이에요. 아래 "회원가입"으로 먼저 계정을 만들어주세요.' };
     const row = existing[0];
-    if(row.pin !== pin){ return { ok:false, message:'PIN이 올바르지 않아요.' }; }
+    if(row.pin !== pin) return { ok:false, message:'PIN이 올바르지 않아요.' };
     return { ok:true, user:{ id: row.id, name: row.name } };
   }
 
@@ -300,11 +292,9 @@
     if(pin !== pinConfirm){ return { ok:false, message:'PIN이 서로 일치하지 않아요. 다시 확인해주세요.' }; }
     const { data: existing, error } = await supabase.from('att_users').select('id').eq('name', name).limit(1);
     if(error) return { ok:false, message:'서버 연결에 실패했어요. 잠시 후 다시 시도해주세요.' };
-    if(existing && existing.length > 0){
-      return { ok:false, message:'이미 사용 중인 이름이에요. 동명이인이라면 이름을 다르게 등록해주세요 (예: 홍길동2). 이미 등록한 계정이라면 로그인해주세요.' };
-    }
+    if(existing && existing.length > 0) return { ok:false, message:'이미 사용 중인 이름이에요. 동명이인이라면 이름을 다르게 등록해주세요 (예: 홍길동2).' };
     const { data: created, error: insErr } = await supabase.from('att_users').insert({ name, pin }).select('id,name').single();
-    if(insErr) return { ok:false, message:'계정 생성에 실패했어요. 잠시 후 다시 시도해주세요.' };
+    if(insErr) return { ok:false, message:'계정 생성에 실패했어요.' };
     return { ok:true, user:{ id: created.id, name: created.name } };
   }
 
@@ -313,25 +303,20 @@
     if(!name){ return { ok:false, message:'이름을 입력해주세요.' }; }
     if(!/^\d{4}$/.test(oldPin)){ return { ok:false, message:'기존 PIN은 숫자 4자리로 입력해주세요.' }; }
     if(!/^\d{4}$/.test(newPin)){ return { ok:false, message:'변경할 PIN은 숫자 4자리로 입력해주세요.' }; }
-    if(newPin !== newPinConfirm){ return { ok:false, message:'변경할 PIN이 서로 일치하지 않아요. 다시 확인해주세요.' }; }
+    if(newPin !== newPinConfirm){ return { ok:false, message:'변경할 PIN이 서로 일치하지 않아요.' }; }
     if(oldPin === newPin){ return { ok:false, message:'기존 PIN과 다른 값으로 설정해주세요.' }; }
     const { data: existing, error } = await supabase.from('att_users').select('id,pin').eq('name', name).limit(1);
-    if(error) return { ok:false, message:'서버 연결에 실패했어요. 잠시 후 다시 시도해주세요.' };
-    if(!existing || existing.length === 0){ return { ok:false, message:'등록되지 않은 이름이에요.' }; }
+    if(error) return { ok:false, message:'서버 연결에 실패했어요.' };
+    if(!existing || existing.length === 0) return { ok:false, message:'등록되지 않은 이름이에요.' };
     const row = existing[0];
-    if(row.pin !== oldPin){ return { ok:false, message:'기존 PIN이 올바르지 않아요.' }; }
+    if(row.pin !== oldPin) return { ok:false, message:'기존 PIN이 올바르지 않아요.' };
     const { error: updErr } = await supabase.from('att_users').update({ pin: newPin }).eq('id', row.id);
-    if(updErr) return { ok:false, message:'PIN 변경에 실패했어요. 잠시 후 다시 시도해주세요.' };
+    if(updErr) return { ok:false, message:'PIN 변경에 실패했어요.' };
     return { ok:true, user:{ id: row.id, name } };
   }
 
   function logout(){
-    clearSession();
-    state.user = null;
-    state.days = {};
-    state.todoCategories = [];
-    state.todoItems = [];
-    state.calendarEvents = [];
+    clearSession(); state.user=null; state.days={}; state.todoCategories=[]; state.todoItems=[]; state.calendarEvents=[];
     render();
   }
 
@@ -342,12 +327,9 @@
     if(!supabase || !state.user) return;
     const first = dateKey(state.year, state.month, 1);
     const last = dateKey(state.year, state.month, daysInMonth(state.year, state.month));
-    const { data, error } = await supabase.from('att_days')
-      .select('date_key,leave,check_in,check_out')
+    const { data, error } = await supabase.from('att_days').select('date_key,leave,check_in,check_out')
       .eq('user_id', state.user.id).gte('date_key', first).lte('date_key', last);
-    if(!error && data){
-      data.forEach(row=>{ state.days[row.date_key] = { leave: row.leave, checkIn: row.check_in || '', checkOut: row.check_out || '' }; });
-    }
+    if(!error && data){ data.forEach(row=>{ state.days[row.date_key] = { leave: row.leave, checkIn: row.check_in || '', checkOut: row.check_out || '' }; }); }
   }
 
   async function saveDay(dstr, data){
@@ -359,16 +341,8 @@
     if(!error) flashSave(); else console.error('save failed', error);
   }
 
-  function getDayData(dstr){
-    if(!state.days[dstr]) state.days[dstr] = { leave:'none', checkIn:'', checkOut:'' };
-    return state.days[dstr];
-  }
-
-  function isFamilyDay(y, m, d){
-    const dow = new Date(y, m-1, d).getDay();
-    if(dow !== 5) return false;
-    return Math.ceil(d/7) === 4;
-  }
+  function getDayData(dstr){ if(!state.days[dstr]) state.days[dstr] = { leave:'none', checkIn:'', checkOut:'' }; return state.days[dstr]; }
+  function isFamilyDay(y, m, d){ const dow = new Date(y, m-1, d).getDay(); if(dow !== 5) return false; return Math.ceil(d/7) === 4; }
 
   function computeDay(dow, data, familyDay){
     const plan = planMinutes(dow);
@@ -401,8 +375,7 @@
   // ---------------- To do (과제) 데이터 ----------------
 
   async function loadTodos(){
-    state.todoCategories = [];
-    state.todoItems = [];
+    state.todoCategories = []; state.todoItems = [];
     if(!supabase || !state.user) return;
     const { data: cats } = await supabase.from('todo_categories').select('id,name,sort_order')
       .eq('user_id', state.user.id).order('sort_order', { ascending:true });
@@ -419,8 +392,7 @@
     if(!supabase || !state.user || !name) return;
     const maxOrder = state.todoCategories.reduce((mx,c)=>Math.max(mx, c.sort_order||0), 0);
     const { data, error } = await supabase.from('todo_categories')
-      .insert({ user_id: state.user.id, name, sort_order: maxOrder+1 })
-      .select('id,name,sort_order').single();
+      .insert({ user_id: state.user.id, name, sort_order: maxOrder+1 }).select('id,name,sort_order').single();
     if(!error && data){ state.todoCategories.push(data); state.todoActiveCatId = data.id; flashSave(); }
   }
 
@@ -436,11 +408,9 @@
   async function deleteCategory(catId){
     state.todoCategories = state.todoCategories.filter(c=>c.id!==catId);
     state.todoItems = state.todoItems.filter(i=>i.category_id!==catId);
-    if(state.todoActiveCatId === catId){
-      state.todoActiveCatId = state.todoCategories.length>0 ? state.todoCategories[0].id : null;
-    }
+    if(state.todoActiveCatId === catId){ state.todoActiveCatId = state.todoCategories.length>0 ? state.todoCategories[0].id : null; }
     render();
-    await supabase.from('todo_categories').delete().eq('id', catId); // items cascade
+    await supabase.from('todo_categories').delete().eq('id', catId);
   }
 
   async function addTodoItem(categoryId, content, dueDate){
@@ -462,13 +432,22 @@
 
   async function deleteTodoItem(itemId){
     state.todoItems = state.todoItems.filter(i=>i.id!==itemId);
+    if(state.todoItemEditing === itemId) state.todoItemEditing = null;
     render();
     await supabase.from('todo_items').delete().eq('id', itemId);
   }
 
-  function cycleStatus(current){
-    const idx = STATUS_ORDER.indexOf(current);
-    return STATUS_ORDER[(idx+1) % STATUS_ORDER.length];
+  function cycleStatus(current){ const idx = STATUS_ORDER.indexOf(current); return STATUS_ORDER[(idx+1) % STATUS_ORDER.length]; }
+
+  function sortedItemsFor(catId){
+    return state.todoItems.filter(i=>i.category_id===catId).slice().sort((a,b)=>{
+      const aDone = a.status==='done', bDone = b.status==='done';
+      if(aDone !== bDone) return aDone ? -1 : 1;
+      if(!a.due_date && !b.due_date) return 0;
+      if(!a.due_date) return 1;
+      if(!b.due_date) return -1;
+      return a.due_date.localeCompare(b.due_date);
+    });
   }
 
   // ---------------- 캘린더 데이터 ----------------
@@ -479,17 +458,17 @@
     const first = new Date(state.calendarYear, state.calendarMonth-1, 1).toISOString();
     const last = new Date(state.calendarYear, state.calendarMonth, 1).toISOString();
     const { data } = await supabase.from('calendar_events')
-      .select('id,title,location,start_at,end_at')
+      .select('id,title,location,start_at,end_at,all_day')
       .eq('user_id', state.user.id).gte('start_at', first).lt('start_at', last)
       .order('start_at', { ascending:true });
     state.calendarEvents = data || [];
   }
 
-  async function addCalendarEvent(title, location, startAt, endAt){
+  async function addCalendarEvent(title, location, startAt, endAt, allDay){
     if(!supabase || !state.user || !title || !startAt || !endAt) return;
     const { data, error } = await supabase.from('calendar_events')
-      .insert({ user_id: state.user.id, title, location: location || null, start_at: startAt, end_at: endAt })
-      .select('id,title,location,start_at,end_at').single();
+      .insert({ user_id: state.user.id, title, location: location || null, start_at: startAt, end_at: endAt, all_day: !!allDay })
+      .select('id,title,location,start_at,end_at,all_day').single();
     if(!error && data){ state.calendarEvents.push(data); flashSave(); }
   }
 
@@ -545,12 +524,10 @@
       btn.disabled = true; btn.textContent = '로그인 중...';
       const res = await login(nameEl.value.trim(), pinEl.value.trim());
       if(res.ok){
-        state.user = res.user; state.loginError = ''; saveSession(res.user);
+        state.user = res.user; state.loginError=''; saveSession(res.user);
         await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents()]);
         render();
-      } else {
-        state.loginError = res.message; btn.disabled = false; btn.textContent = '로그인'; render();
-      }
+      } else { state.loginError = res.message; btn.disabled=false; btn.textContent='로그인'; render(); }
     }
     btn.addEventListener('click', doLogin);
     [nameEl, pinEl].forEach(el=>{ el.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }); });
@@ -586,9 +563,7 @@
         state.user = res.user; state.signupError=''; saveSession(res.user);
         await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents()]);
         render();
-      } else {
-        state.signupError = res.message; btn.disabled=false; btn.textContent='회원가입'; render();
-      }
+      } else { state.signupError = res.message; btn.disabled=false; btn.textContent='회원가입'; render(); }
     }
     btn.addEventListener('click', doSignup);
     [nameEl, pinEl, pinConfirmEl].forEach(el=>{ el.addEventListener('keydown', e=>{ if(e.key==='Enter') doSignup(); }); });
@@ -625,9 +600,7 @@
         state.user = res.user; state.changePinError=''; saveSession(res.user);
         await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents()]);
         render();
-      } else {
-        state.changePinError = res.message; btn.disabled=false; btn.textContent='PIN 변경'; render();
-      }
+      } else { state.changePinError = res.message; btn.disabled=false; btn.textContent='PIN 변경'; render(); }
     }
     btn.addEventListener('click', doChangePin);
     [nameEl, oldPinEl, newPinEl, newPinConfirmEl].forEach(el=>{ el.addEventListener('keydown', e=>{ if(e.key==='Enter') doChangePin(); }); });
@@ -786,6 +759,34 @@
 
   // ---------------- 렌더링: To do list 탭 (과제 탭 + 캘린더) ----------------
 
+  function itemRowHtml(item){
+    const editing = state.todoItemEditing === item.id;
+    if(editing){
+      return `
+        <div class="todo-row" data-item="${item.id}">
+          <button class="status-toggle status-${item.status}" data-item="${item.id}" title="상태 변경">${STATUS_ICON[item.status]}</button>
+          <input type="date" class="todo-due-edit" data-item="${item.id}" value="${item.due_date || ''}">
+          <input type="text" class="todo-content-edit" data-item="${item.id}" value="${escapeHtml(item.content)}" maxlength="200">
+          <div class="todo-item-actions">
+            <button class="todo-icon-btn" data-save="${item.id}" title="저장">✓</button>
+            <button class="todo-icon-btn danger" data-cancel="${item.id}" title="취소">×</button>
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="todo-row" data-item="${item.id}">
+        <button class="status-toggle status-${item.status}" data-item="${item.id}" title="상태 변경">${STATUS_ICON[item.status]}</button>
+        <span class="todo-due-text">${item.due_date || '-'}</span>
+        <span class="todo-content-text${item.status==='done' ? ' done' : ''}">${escapeHtml(item.content)}</span>
+        <div class="todo-item-actions">
+          <button class="todo-icon-btn" data-edit="${item.id}" title="수정">✎</button>
+          <button class="todo-icon-btn danger" data-delete="${item.id}" title="삭제">×</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderTaskPanel(){
     if(state.todoCategories.length === 0){
       return `<div class="card"><div class="todo-empty">아직 과제가 없어요. 아래에서 하나 추가해보세요.</div>
@@ -798,26 +799,12 @@
 
     const activeCat = state.todoCategories.find(c=>c.id===state.todoActiveCatId) || state.todoCategories[0];
     const isEditing = state.todoCatEditing === activeCat.id;
-
     const tabsHtml = state.todoCategories.map(c=>`
-      <button class="subtab-btn ${c.id===activeCat.id ? 'active' : ''}" data-cat="${c.id}">${c.name}</button>
+      <button class="subtab-btn ${c.id===activeCat.id ? 'active' : ''}" data-cat="${c.id}">${escapeHtml(c.name)}</button>
     `).join('') + `<button class="subtab-btn add-new" id="newTaskTabBtn">+ 과제</button>`;
 
-    const items = state.todoItems.filter(i=>i.category_id===activeCat.id).slice().sort((a,b)=>{
-      if(!a.due_date && !b.due_date) return 0;
-      if(!a.due_date) return 1;
-      if(!b.due_date) return -1;
-      return a.due_date.localeCompare(b.due_date);
-    });
-
-    const itemRows = items.map(item=>`
-      <div class="todo-row" data-item="${item.id}">
-        <button class="status-toggle status-${item.status}" data-item="${item.id}" title="상태 변경">${STATUS_ICON[item.status]}</button>
-        <input type="date" class="todo-due-edit" data-item="${item.id}" value="${item.due_date || ''}">
-        <input type="text" class="todo-content-edit${item.status==='done' ? ' done' : ''}" data-item="${item.id}" value="${item.content.replace(/"/g,'&quot;')}" maxlength="200">
-        <button class="todo-delete" data-item="${item.id}" title="삭제">×</button>
-      </div>
-    `).join('') || `<div class="todo-empty">할 일이 없어요.</div>`;
+    const items = sortedItemsFor(activeCat.id);
+    const itemRows = items.map(itemRowHtml).join('') || `<div class="todo-empty">할 일이 없어요.</div>`;
 
     return `
       <div class="card" style="margin-bottom:12px;">
@@ -830,20 +817,26 @@
       <div class="card">
         <div class="task-header">
           ${isEditing
-            ? `<input type="text" class="title-edit" id="taskTitleEdit" value="${activeCat.name.replace(/"/g,'&quot;')}" maxlength="40">`
-            : `<h2>${activeCat.name}</h2>`}
+            ? `<input type="text" class="title-edit" id="taskTitleEdit" value="${escapeHtml(activeCat.name)}" maxlength="40">`
+            : `<h2>${escapeHtml(activeCat.name)}</h2>`}
           <div class="task-actions">
             ${isEditing
               ? `<button id="taskSaveBtn">저장</button><button id="taskCancelBtn">취소</button>`
               : `<button id="taskEditBtn">수정</button><button class="danger" id="taskDeleteBtn">삭제</button>`}
           </div>
         </div>
+        <div class="todo-legend">
+          상태 아이콘을 눌러 순서대로 바꿔요:
+          <span class="dot pending"></span>대기
+          <span class="dot progress"></span>진행중
+          <span class="dot done"></span>완료(완료 항목은 맨 위로 정렬되고 옅은 회색 취소선으로 표시)
+        </div>
         <div class="todo-cat-items">${itemRows}</div>
         <div class="todo-row todo-add-row">
           <span></span>
           <input type="date" class="todo-due-input" id="newItemDue">
           <input type="text" class="todo-content-input" id="newItemContent" placeholder="할 일을 입력하고 Enter" maxlength="200">
-          <button class="btn-primary todo-add-btn" id="newItemAddBtn" style="padding:6px 10px;">추가</button>
+          <button class="btn-primary todo-add-btn" id="newItemAddBtn" style="padding:6px 8px;font-size:11px;">추가</button>
         </div>
       </div>
     `;
@@ -870,17 +863,18 @@
     const selDate = state.calendarSelectedDate;
     const dayStart = new Date(selDate + 'T00:00:00');
     const dayEnd = new Date(selDate + 'T23:59:59');
-    const dayEvents = state.calendarEvents.filter(e=>{
+    const dayEventsAll = state.calendarEvents.filter(e=>{
       const s = new Date(e.start_at), en = new Date(e.end_at);
       return s <= dayEnd && en >= dayStart;
     }).sort((a,b)=> new Date(a.start_at) - new Date(b.start_at));
 
+    const allDayEvents = dayEventsAll.filter(e=>e.all_day);
+    const timedEvents = dayEventsAll.filter(e=>!e.all_day);
+
     const hourRows = [];
-    for(let h=0; h<24; h++){
-      hourRows.push(`<div class="cal-hour-row" style="top:${h*40}px;"><span class="cal-hour-label">${pad(h)}:00</span></div>`);
-    }
-    const pxPerMin = 40/60;
-    const eventBars = dayEvents.map(e=>{
+    for(let h=0; h<24; h++){ hourRows.push(`<div class="cal-hour-row" style="top:${h*50}px;"><span class="cal-hour-label">${pad(h)}:00</span></div>`); }
+    const pxPerMin = 50/60;
+    const eventBars = timedEvents.map(e=>{
       const s = new Date(e.start_at), en = new Date(e.end_at);
       const clipStart = s < dayStart ? dayStart : s;
       const clipEnd = en > dayEnd ? dayEnd : en;
@@ -888,18 +882,24 @@
       let endMin = clipEnd.getHours()*60 + clipEnd.getMinutes();
       if(endMin <= startMin) endMin = startMin + 20;
       const top = startMin * pxPerMin;
-      const height = Math.max(18, (endMin - startMin) * pxPerMin);
-      return `<div class="cal-event-bar" style="top:${top}px;height:${height}px;" data-event="${e.id}" title="${e.title.replace(/"/g,'&quot;')}">
-        ${e.title}${e.location ? `<span class="loc">${e.location}</span>` : ''}
+      const height = Math.max(22, (endMin - startMin) * pxPerMin);
+      return `<div class="cal-event-bar" style="top:${top}px;height:${height}px;" data-event="${e.id}" title="${escapeHtml(e.title)}">
+        ${escapeHtml(e.title)}${e.location ? `<span class="loc">${escapeHtml(e.location)}</span>` : ''}
       </div>`;
     }).join('');
 
-    const listHtml = dayEvents.map(e=>{
+    const allDayHtml = allDayEvents.length > 0 ? `
+      <div class="cal-allday-section">
+        ${allDayEvents.map(e=>`<span class="cal-allday-chip" data-event="${e.id}" title="클릭해서 삭제">종일 · ${escapeHtml(e.title)}${e.location ? ' · '+escapeHtml(e.location) : ''}</span>`).join('')}
+      </div>
+    ` : '';
+
+    const listHtml = dayEventsAll.map(e=>{
       const s = new Date(e.start_at), en = new Date(e.end_at);
-      const timeStr = `${pad(s.getHours())}:${pad(s.getMinutes())} ~ ${pad(en.getHours())}:${pad(en.getMinutes())}`;
+      const timeStr = e.all_day ? '종일' : `${pad(s.getHours())}:${pad(s.getMinutes())} ~ ${pad(en.getHours())}:${pad(en.getMinutes())}`;
       return `
         <div class="cal-event-list-item">
-          <div class="meta"><span class="t">${e.title}</span>${timeStr}${e.location ? ' · '+e.location : ''}</div>
+          <div class="meta"><span class="t">${escapeHtml(e.title)}</span>${timeStr}${e.location ? ' · '+escapeHtml(e.location) : ''}</div>
           <button class="cal-event-del" data-event="${e.id}" title="삭제">×</button>
         </div>
       `;
@@ -919,22 +919,16 @@
         </div>
 
         <div class="cal-add-form">
-          <div>
-            <label>제목</label>
-            <input type="text" id="evTitle" placeholder="일정 제목" maxlength="80">
-          </div>
-          <div>
-            <label>장소</label>
-            <input type="text" id="evLocation" placeholder="장소 (선택)" maxlength="80">
-          </div>
-          <div class="row2">
-            <div><label>시작</label><input type="datetime-local" id="evStart"></div>
-            <div><label>종료</label><input type="datetime-local" id="evEnd"></div>
-          </div>
+          <div><label>제목</label><input type="text" id="evTitle" placeholder="일정 제목" maxlength="80"></div>
+          <div><label>장소</label><input type="text" id="evLocation" placeholder="장소 (선택)" maxlength="80"></div>
+          <div class="cal-allday-row"><input type="checkbox" id="evAllDay"><label for="evAllDay">종일</label></div>
+          <div><label>시작</label><input type="datetime-local" id="evStart"></div>
+          <div><label>종료</label><input type="datetime-local" id="evEnd"></div>
           <button class="btn-primary" id="evAddBtn">일정 추가</button>
         </div>
 
         <div class="cal-selected-label">${selDate} 일정</div>
+        ${allDayHtml}
         <div class="cal-timeline" id="calTimeline">
           ${hourRows.join('')}
           ${eventBars}
@@ -946,7 +940,7 @@
 
   function renderTodoHtml(){
     return `
-      <div class="top-grid">
+      <div class="todo-grid">
         <div>${renderTaskPanel()}</div>
         <div>${renderCalendarPanel()}</div>
       </div>
@@ -954,53 +948,43 @@
   }
 
   function attachTodoHandlers(){
-    // 과제 추가
     const newCatInput = document.getElementById('newCategoryInput');
     const addCatBtn = document.getElementById('addCategoryBtn');
     async function doAddCategory(){
       const name = newCatInput.value.trim();
       if(!name) return;
-      addCatBtn.disabled = true;
-      await addCategory(name);
-      addCatBtn.disabled = false;
-      render();
+      addCatBtn.disabled = true; await addCategory(name); addCatBtn.disabled = false; render();
     }
     if(addCatBtn) addCatBtn.addEventListener('click', doAddCategory);
     if(newCatInput) newCatInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doAddCategory(); });
     const newTaskTabBtn = document.getElementById('newTaskTabBtn');
     if(newTaskTabBtn) newTaskTabBtn.addEventListener('click', ()=>{ if(newCatInput) newCatInput.focus(); });
 
-    // 과제 탭 전환
     document.querySelectorAll('.subtab-btn[data-cat]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         state.todoActiveCatId = btn.getAttribute('data-cat');
-        state.todoCatEditing = null;
+        state.todoCatEditing = null; state.todoItemEditing = null;
         render();
       });
     });
 
-    // 과제 수정/삭제
     const editBtn = document.getElementById('taskEditBtn');
     if(editBtn) editBtn.addEventListener('click', ()=>{ state.todoCatEditing = state.todoActiveCatId; render(); });
     const deleteBtn = document.getElementById('taskDeleteBtn');
     if(deleteBtn) deleteBtn.addEventListener('click', ()=>{
       const cat = state.todoCategories.find(c=>c.id===state.todoActiveCatId);
-      if(cat && confirm(`"${cat.name}" 과제를 삭제할까요? 안의 할 일도 모두 삭제됩니다.`)){
-        deleteCategory(state.todoActiveCatId);
-      }
+      if(cat && confirm(`"${cat.name}" 과제를 삭제할까요? 안의 할 일도 모두 삭제됩니다.`)){ deleteCategory(state.todoActiveCatId); }
     });
-    const saveBtn = document.getElementById('taskSaveBtn');
-    if(saveBtn) saveBtn.addEventListener('click', async ()=>{
+    const saveCatBtn = document.getElementById('taskSaveBtn');
+    if(saveCatBtn) saveCatBtn.addEventListener('click', async ()=>{
       const input = document.getElementById('taskTitleEdit');
       const name = input.value.trim();
       if(name){ await renameCategory(state.todoActiveCatId, name); }
-      state.todoCatEditing = null;
-      render();
+      state.todoCatEditing = null; render();
     });
-    const cancelBtn = document.getElementById('taskCancelBtn');
-    if(cancelBtn) cancelBtn.addEventListener('click', ()=>{ state.todoCatEditing = null; render(); });
+    const cancelCatBtn = document.getElementById('taskCancelBtn');
+    if(cancelCatBtn) cancelCatBtn.addEventListener('click', ()=>{ state.todoCatEditing = null; render(); });
 
-    // 할 일 상태/수정/삭제
     document.querySelectorAll('.status-toggle').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const id = btn.getAttribute('data-item');
@@ -1010,25 +994,29 @@
         render();
       });
     });
-    document.querySelectorAll('.todo-due-edit').forEach(el=>{
-      el.addEventListener('change', async ()=>{
-        await updateTodoItem(el.getAttribute('data-item'), { due_date: el.value || null });
+
+    document.querySelectorAll('[data-edit]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ state.todoItemEditing = btn.getAttribute('data-edit'); render(); });
+    });
+    document.querySelectorAll('[data-cancel]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ state.todoItemEditing = null; render(); });
+    });
+    document.querySelectorAll('[data-save]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-save');
+        const row = btn.closest('.todo-row');
+        const due = row.querySelector('.todo-due-edit').value || null;
+        const content = row.querySelector('.todo-content-edit').value.trim();
+        if(!content) return;
+        await updateTodoItem(id, { due_date: due, content });
+        state.todoItemEditing = null;
         render();
       });
     });
-    document.querySelectorAll('.todo-content-edit').forEach(el=>{
-      el.addEventListener('change', async ()=>{
-        const val = el.value.trim();
-        if(!val) return;
-        await updateTodoItem(el.getAttribute('data-item'), { content: val });
-        render();
-      });
-    });
-    document.querySelectorAll('.todo-delete').forEach(btn=>{
-      btn.addEventListener('click', ()=>{ deleteTodoItem(btn.getAttribute('data-item')); });
+    document.querySelectorAll('[data-delete]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ deleteTodoItem(btn.getAttribute('data-delete')); });
     });
 
-    // 할 일 추가
     const newItemContent = document.getElementById('newItemContent');
     const newItemDue = document.getElementById('newItemDue');
     const newItemAddBtn = document.getElementById('newItemAddBtn');
@@ -1045,7 +1033,6 @@
       newItemContent.addEventListener('keydown', e=>{ if(e.key==='Enter') doAddItem(); });
     }
 
-    // 캘린더 월 이동
     const calPrev = document.getElementById('cal-prev-month');
     const calNext = document.getElementById('cal-next-month');
     if(calPrev) calPrev.addEventListener('click', async ()=>{
@@ -1057,48 +1044,63 @@
       await loadCalendarEvents(); render();
     });
 
-    // 날짜 선택
     document.querySelectorAll('.mini-cal .day[data-date]').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        state.calendarSelectedDate = el.getAttribute('data-date');
-        render();
-      });
+      el.addEventListener('click', ()=>{ state.calendarSelectedDate = el.getAttribute('data-date'); render(); });
     });
 
-    // 일정 추가
     const evTitle = document.getElementById('evTitle');
     const evLocation = document.getElementById('evLocation');
+    const evAllDay = document.getElementById('evAllDay');
     const evStart = document.getElementById('evStart');
     const evEnd = document.getElementById('evEnd');
     const evAddBtn = document.getElementById('evAddBtn');
     if(evAddBtn){
-      // 선택된 날짜를 기본값으로 채워줌
       if(evStart && !evStart.value) evStart.value = `${state.calendarSelectedDate}T09:00`;
       if(evEnd && !evEnd.value) evEnd.value = `${state.calendarSelectedDate}T10:00`;
+
+      evAllDay.addEventListener('change', ()=>{
+        if(evAllDay.checked){
+          const sDate = evStart.value ? evStart.value.slice(0,10) : state.calendarSelectedDate;
+          const eDate = evEnd.value ? evEnd.value.slice(0,10) : state.calendarSelectedDate;
+          evStart.type = 'date'; evStart.value = sDate;
+          evEnd.type = 'date'; evEnd.value = eDate;
+        } else {
+          const sDate = evStart.value || state.calendarSelectedDate;
+          const eDate = evEnd.value || state.calendarSelectedDate;
+          evStart.type = 'datetime-local'; evStart.value = `${sDate}T09:00`;
+          evEnd.type = 'datetime-local'; evEnd.value = `${eDate}T10:00`;
+        }
+      });
+
       evAddBtn.addEventListener('click', async ()=>{
         const title = evTitle.value.trim();
         if(!title || !evStart.value || !evEnd.value) return;
-        const startIso = new Date(evStart.value).toISOString();
-        const endIso = new Date(evEnd.value).toISOString();
-        evAddBtn.disabled = true;
-        await addCalendarEvent(title, evLocation.value.trim(), startIso, endIso);
-        evAddBtn.disabled = false;
-        const newDate = evStart.value.slice(0,10);
-        if(newDate !== state.calendarSelectedDate || newDate.slice(0,7) !== monthKey(state.calendarYear, state.calendarMonth)){
-          // 추가한 일정이 현재 보고 있는 달/날짜와 다르면 그쪽으로 이동
-          const [ny, nm] = newDate.split('-').map(Number);
-          if(ny !== state.calendarYear || nm !== state.calendarMonth){
-            state.calendarYear = ny; state.calendarMonth = nm;
-            await loadCalendarEvents();
-          }
-          state.calendarSelectedDate = newDate;
+        const isAllDay = evAllDay.checked;
+        let startIso, endIso, newDate;
+        if(isAllDay){
+          startIso = new Date(evStart.value + 'T00:00:00').toISOString();
+          endIso = new Date(evEnd.value + 'T23:59:59').toISOString();
+          newDate = evStart.value;
+        } else {
+          startIso = new Date(evStart.value).toISOString();
+          endIso = new Date(evEnd.value).toISOString();
+          newDate = evStart.value.slice(0,10);
         }
+        evAddBtn.disabled = true;
+        await addCalendarEvent(title, evLocation.value.trim(), startIso, endIso, isAllDay);
+        evAddBtn.disabled = false;
+
+        const [ny, nm] = newDate.split('-').map(Number);
+        if(ny !== state.calendarYear || nm !== state.calendarMonth){
+          state.calendarYear = ny; state.calendarMonth = nm;
+          await loadCalendarEvents();
+        }
+        state.calendarSelectedDate = newDate;
         render();
       });
     }
 
-    // 일정 삭제 (타임라인 바 또는 목록에서)
-    document.querySelectorAll('.cal-event-del, .cal-event-bar').forEach(el=>{
+    document.querySelectorAll('.cal-event-del, .cal-event-bar, .cal-allday-chip').forEach(el=>{
       el.addEventListener('click', ()=>{
         const id = el.getAttribute('data-event');
         if(id) deleteCalendarEvent(id);
