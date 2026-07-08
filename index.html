@@ -237,7 +237,7 @@
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
-  const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:480 };
+  const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
   const SESSION_KEY = 'att_session_v1';
@@ -436,7 +436,8 @@
   function isFamilyDay(y, m, d){ const dow = new Date(y, m-1, d).getDay(); if(dow !== 5) return false; return Math.ceil(d/7) === 4; }
 
   function computeDay(dow, data, familyDay){
-    const plan = planMinutes(dow);
+    const isPublicHoliday = data.leave === 'holiday';
+    const plan = isPublicHoliday ? 0 : planMinutes(dow);
     const leaveMin = LEAVE_MIN[data.leave || 'none'] || 0;
     const inM = timeToMin(data.checkIn);
     const outM = timeToMin(data.checkOut);
@@ -774,7 +775,7 @@
           <div class="card" style="margin-bottom:12px;">
             <h2>규칙</h2>
             <div class="legend">
-              <b>규칙</b> · 점심휴게: 11:30~12:30 중 근무한 만큼만 자동 차감 (예: 11:53 출근 → 37분) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · 연차/공휴일은 하루치(8:00)로 인정되어 근무 현황에서 차감되지 않음 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로+연차시간-계획근무)의 월 누적값 · 출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다
+              <b>규칙</b> · 점심휴게: 11:30~12:30 중 근무한 만큼만 자동 차감 (예: 11:53 출근 → 37분) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · 연차는 하루치(8:00)로 인정되어 근무 현황에서 차감되지 않음 · <b>공휴일은 주말처럼 계획근무가 0으로 처리</b>되어 그냥 쉬면 근무 현황에 영향 없고, 그날 실제로 근무하면 휴일근로로 집계되어 대체휴일에 반영됨 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로+연차시간-계획근무)의 월 누적값 · 출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다
             </div>
           </div>
           <div class="table-wrap">
