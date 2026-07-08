@@ -729,7 +729,8 @@
       totals.plan += c.plan; totals.dur += (c.dur||0); totals.lunch += c.lunch; totals.dinner += c.dinner;
       totals.actual += (c.actual||0); totals.holiday += c.holidayWork; totals.leave += c.leaveMin;
 
-      const rowClass = dow===6 ? 'weekend-sat' : (dow===0 ? 'weekend-sun' : '');
+      const isPublicHoliday = data.leave === 'holiday';
+      const rowClass = isPublicHoliday ? 'weekend-sun' : (dow===6 ? 'weekend-sat' : (dow===0 ? 'weekend-sun' : ''));
       const weekdayLabel = DOW_LABEL[dow];
       const tabIn = d*2 - 1, tabOut = d*2;
 
