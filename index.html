@@ -30,10 +30,12 @@
     font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',Roboto,'Noto Sans',sans-serif;
   }
   *{box-sizing:border-box;}
-  body,#app{margin:0;color:var(--ink);}
+  html{background:var(--paper);}
+  body,#app{margin:0;color:var(--ink);background:var(--paper);}
+  body{min-height:100vh;min-height:100dvh;}
   .mono{font-family:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;font-variant-numeric:tabular-nums;}
 
-  #app{background:var(--paper);padding:20px;min-height:100vh;}
+  #app{background:var(--paper);padding:20px;min-height:100vh;min-height:100dvh;}
 
   .header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
   .header h1{font-size:19px;font-weight:700;letter-spacing:-0.01em;margin:0;}
@@ -950,29 +952,28 @@
             </table>
           </div>
         </div>
-        <div class="card">
-          <h2>정산</h2>
-          <div class="summary-item"><span class="label">월 근무시간 (실제)</span><span class="val mono">${minToStr(actualMonthTotal)}</span></div>
-          <div class="summary-item"><span class="label">월 근무시간 (계획)</span><span class="val mono">${minToStr(planMonthTotal)}</span></div>
-          <div class="summary-item"><span class="label">대체휴일</span><span class="val mono">${compDays}</span></div>
-          <div class="summary-item"><span class="label">저녁식대</span><span class="val mono">₩${mealTotal.toLocaleString()}</span></div>
-          <div class="balance-wrap">
-            <div class="summary-item" style="border:none;padding-bottom:4px;"><span class="label">근무 밸런스</span><span class="val mono ${balanceMinutes>=0?'diff-pos':'diff-neg'}">${minToStr(balanceMinutes, true)}</span></div>
-            <div class="balance-track">
-              <div class="balance-center"></div>
-              ${balanceMinutes>=0
-                ? `<div class="balance-fill pos" style="width:${Math.abs(pct)/2}%;"></div>`
-                : `<div class="balance-fill neg" style="width:${Math.abs(pct)/2}%;"></div>`}
+        <div>
+          <div class="card">
+            <h2>정산</h2>
+            <div class="summary-item"><span class="label">월 근무시간 (실제)</span><span class="val mono">${minToStr(actualMonthTotal)}</span></div>
+            <div class="summary-item"><span class="label">월 근무시간 (계획)</span><span class="val mono">${minToStr(planMonthTotal)}</span></div>
+            <div class="summary-item"><span class="label">대체휴일</span><span class="val mono">${compDays}</span></div>
+            <div class="summary-item"><span class="label">저녁식대</span><span class="val mono">₩${mealTotal.toLocaleString()}</span></div>
+            <div class="balance-wrap">
+              <div class="summary-item" style="border:none;padding-bottom:4px;"><span class="label">근무 밸런스</span><span class="val mono ${balanceMinutes>=0?'diff-pos':'diff-neg'}">${minToStr(balanceMinutes, true)}</span></div>
+              <div class="balance-track">
+                <div class="balance-center"></div>
+                ${balanceMinutes>=0
+                  ? `<div class="balance-fill pos" style="width:${Math.abs(pct)/2}%;"></div>`
+                  : `<div class="balance-fill neg" style="width:${Math.abs(pct)/2}%;"></div>`}
+              </div>
+              <div class="balance-label"><span>부족</span><span>초과</span></div>
             </div>
-            <div class="balance-label"><span>부족</span><span>초과</span></div>
           </div>
-        </div>
-      </div>
-      <div class="top-grid" style="margin-top:16px;">
-        <div></div>
-        <div class="card">
-          <h2>규칙</h2>
-          <div class="legend">${RULE_LINES.map(l=>`<div class="legend-line">· ${l}</div>`).join('')}</div>
+          <div class="card" style="margin-top:16px;">
+            <h2>규칙</h2>
+            <div class="legend">${RULE_LINES.map(l=>`<div class="legend-line">· ${l}</div>`).join('')}</div>
+          </div>
         </div>
       </div>
     `;
