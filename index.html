@@ -121,10 +121,12 @@
   .paste-textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;font-family:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;resize:vertical;}
   .paste-textarea:focus{outline:2px solid var(--accent);outline-offset:1px;}
   .paste-preview{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:10px;}
-  .paste-row{display:grid;grid-template-columns:36px 100px 96px 1fr 1fr;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid #EEF1F0;font-size:12px;}
+  .paste-row{display:grid;grid-template-columns:36px 100px 96px 1fr 1fr 68px;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid #EEF1F0;font-size:12px;}
   .paste-row:last-child{border-bottom:none;}
   .paste-row.paste-head{background:#EEF2F1;font-weight:700;color:#5a6469;}
   .paste-row select, .paste-row input[type=text]{border:1px solid var(--line);border-radius:6px;padding:4px 5px;font-size:12px;width:100%;text-align:center;}
+  .paste-ot label{display:flex;align-items:center;gap:3px;font-size:11px;color:#54606a;white-space:nowrap;cursor:pointer;}
+  .paste-hint{font-size:11px;color:#8b9298;margin-top:6px;line-height:1.5;}
   .legend b{color:#5a6469;}
 
   .save-flag{font-size:11px;color:var(--accent);opacity:0;transition:opacity .3s;}
@@ -583,7 +585,15 @@
           }
         }
       }
-      return { year: r.year, month: r.month, day: r.day, status: r.status, leave: r.leave, checkIn, checkOut, include: true };
+      // 22:00을 넘는 근무인지만 미리 계산해서 미리보기에서 알려줌 (자동으로 체크하지는 않음 - 사용자가 직접 선택)
+      let overtimeEligible = false;
+      if(checkIn && checkOut){
+        const inM = timeToMin(checkIn);
+        const rawOutM = timeToMin(checkOut);
+        const outAdj = rawOutM < inM ? rawOutM + 24*60 : rawOutM;
+        if(outAdj > 22*60) overtimeEligible = true;
+      }
+      return { year: r.year, month: r.month, day: r.day, status: r.status, leave: r.leave, checkIn, checkOut, overtime: false, overtimeEligible, include: true };
     });
 
     // 최신 날짜가 먼저 나오는 원문 순서를 날짜 오름차순으로 정렬
@@ -596,11 +606,11 @@
     const dstr = dateKey(row.year, row.month, row.day);
     const { error } = await supabase.from('att_days').upsert({
       user_id: state.user.id, date_key: dstr, leave: row.leave,
-      check_in: row.checkIn, check_out: row.checkOut, overtime: false,
+      check_in: row.checkIn, check_out: row.checkOut, overtime: !!row.overtime,
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id,date_key' });
     if(!error && row.year === state.year && row.month === state.month){
-      state.days[dstr] = { leave: row.leave, checkIn: row.checkIn, checkOut: row.checkOut, overtime: false };
+      state.days[dstr] = { leave: row.leave, checkIn: row.checkIn, checkOut: row.checkOut, overtime: !!row.overtime };
     }
   }
 
@@ -861,15 +871,17 @@
         </select>
         <input type="text" inputmode="numeric" class="paste-time mono" data-idx="${i}" data-f="checkIn" value="${r.checkIn||''}" placeholder="09:00">
         <input type="text" inputmode="numeric" class="paste-time mono" data-idx="${i}" data-f="checkOut" value="${r.checkOut||''}" placeholder="18:00">
+        <span class="paste-ot">${r.overtimeEligible ? `<label><input type="checkbox" class="paste-overtime" data-idx="${i}" ${r.overtime?'checked':''}> 연장</label>` : ''}</span>
       </div>
     `).join('');
     return `
       <div class="paste-preview">
         <div class="paste-row paste-head">
-          <span>포함</span><span>날짜</span><span>연차/휴일</span><span>출근</span><span>퇴근</span>
+          <span>포함</span><span>날짜</span><span>연차/휴일</span><span>출근</span><span>퇴근</span><span>22시↑</span>
         </div>
         ${rows}
       </div>
+      <div class="paste-hint">"연장" 체크박스는 퇴근이 22:00을 넘는 날에만 나타나요. 체크해야 22:00 이후 시간까지 근무로 인정됩니다.</div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn-primary" id="pasteApplyBtn">선택한 항목 적용 (${state.pastePending.filter(r=>r.include).length}건)</button>
       </div>
@@ -1081,6 +1093,11 @@
         if(v.length>=3) v = v.slice(0,2)+':'+v.slice(2);
         e.target.value = v;
         state.pastePending[+e.target.dataset.idx][e.target.dataset.f] = v;
+      });
+    });
+    document.querySelectorAll('.paste-overtime').forEach(el=>{
+      el.addEventListener('change', e=>{
+        state.pastePending[+e.target.dataset.idx].overtime = e.target.checked;
       });
     });
     const pasteApplyBtn = document.getElementById('pasteApplyBtn');
