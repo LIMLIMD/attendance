@@ -93,6 +93,8 @@
   .diff-pos{color:var(--plus);font-weight:700;}
   .diff-neg{color:var(--minus);font-weight:700;}
   .muted{color:#b7bec2;}
+  .overtime-check{display:flex;align-items:center;gap:4px;font-size:10.5px;color:#54606a;font-weight:600;white-space:nowrap;cursor:pointer;}
+  .overtime-check input{cursor:pointer;}
 
   tfoot td{padding:8px 6px;font-weight:700;background:#EEF2F1;border-top:1px solid var(--line);text-align:center;white-space:nowrap;}
   tfoot td.label-cell{text-align:left;}
@@ -344,6 +346,7 @@
   }
   function timeToMin(t){ if(!t) return null; const p = t.split(':'); if(p.length<2) return null; const h=Number(p[0]), mi=Number(p[1]); if(isNaN(h)||isNaN(mi)) return null; return h*60+mi; }
   function isValidTime24(v){ return /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(v); }
+  function isValidCheckoutTime(v){ return /^[0-2][0-9]:[0-5][0-9]$/.test(v); } // 00:00 ~ 29:59 (야근 시 익일 새벽 표기 허용)
   function minToStr(mins, withSign){
     if(mins===null || mins===undefined || isNaN(mins)) return '';
     const sign = mins<0 ? '-' : (withSign ? '+' : '');
@@ -354,7 +357,7 @@
   function planMinutes(dow){ return (dow>=1 && dow<=5) ? 480 : 0; }
   function nowTimeStr(){ const n = new Date(); return pad(n.getHours()) + ':' + pad(n.getMinutes()); }
   function effectiveDayData(data){
-    if(data.checkIn && !data.checkOut){ return { leave: data.leave, checkIn: data.checkIn, checkOut: nowTimeStr(), _live: true }; }
+    if(data.checkIn && !data.checkOut){ return { leave: data.leave, checkIn: data.checkIn, checkOut: nowTimeStr(), overtime: data.overtime, _live: true }; }
     return data;
   }
 
@@ -418,34 +421,42 @@
     if(!supabase || !state.user) return;
     const first = dateKey(state.year, state.month, 1);
     const last = dateKey(state.year, state.month, daysInMonth(state.year, state.month));
-    const { data, error } = await supabase.from('att_days').select('date_key,leave,check_in,check_out')
+    const { data, error } = await supabase.from('att_days').select('date_key,leave,check_in,check_out,overtime')
       .eq('user_id', state.user.id).gte('date_key', first).lte('date_key', last);
-    if(!error && data){ data.forEach(row=>{ state.days[row.date_key] = { leave: row.leave, checkIn: row.check_in || '', checkOut: row.check_out || '' }; }); }
+    if(!error && data){ data.forEach(row=>{ state.days[row.date_key] = { leave: row.leave, checkIn: row.check_in || '', checkOut: row.check_out || '', overtime: !!row.overtime }; }); }
   }
 
   async function saveDay(dstr, data){
     if(!supabase || !state.user) return;
     const { error } = await supabase.from('att_days').upsert({
       user_id: state.user.id, date_key: dstr, leave: data.leave,
-      check_in: data.checkIn, check_out: data.checkOut, updated_at: new Date().toISOString()
+      check_in: data.checkIn, check_out: data.checkOut, overtime: !!data.overtime, updated_at: new Date().toISOString()
     }, { onConflict: 'user_id,date_key' });
     if(!error) flashSave(); else console.error('save failed', error);
   }
 
-  function getDayData(dstr){ if(!state.days[dstr]) state.days[dstr] = { leave:'none', checkIn:'', checkOut:'' }; return state.days[dstr]; }
+  function getDayData(dstr){ if(!state.days[dstr]) state.days[dstr] = { leave:'none', checkIn:'', checkOut:'', overtime:false }; return state.days[dstr]; }
   function isFamilyDay(y, m, d){ const dow = new Date(y, m-1, d).getDay(); if(dow !== 5) return false; return Math.ceil(d/7) === 4; }
 
   function computeDay(dow, data, familyDay){
+    const baseWeekdayPlan = planMinutes(dow);
     const isPublicHoliday = data.leave === 'holiday';
-    const plan = isPublicHoliday ? 0 : planMinutes(dow);
-    const leaveMin = LEAVE_MIN[data.leave || 'none'] || 0;
+    let plan = baseWeekdayPlan;
+    if(isPublicHoliday) plan = 0;
+    else if(data.leave === 'full') plan = 0;
+    else if(data.leave === 'half') plan = Math.max(0, baseWeekdayPlan - 240);
+    else if(data.leave === 'quarter') plan = Math.max(0, baseWeekdayPlan - 120);
+
+    const leaveMin = LEAVE_MIN[data.leave || 'none'] || 0; // 월 "근무시간(실제)" 합계 표시용
     const inM = timeToMin(data.checkIn);
-    const outM = timeToMin(data.checkOut);
-    let dur=null, lunch=0, dinner=0, actual=null;
+    const outM = timeToMin(data.checkOut); // 27:00처럼 24 이상도 그대로 분 단위로 변환됨
+    let dur=null, lunch=0, dinner=0, actual=null, overtimeEligible=false;
     if(inM!=null && outM!=null){
-      dur = outM - inM;
-      if(dur < 0) dur += 24*60;
-      const outAdj = outM < inM ? outM + 24*60 : outM;
+      let outAdj = outM < inM ? outM + 24*60 : outM; // "03:00" 같은 소표기는 익일로 자동 보정
+      const CAP = 22*60; // 22:00
+      overtimeEligible = outAdj > CAP;
+      if(overtimeEligible && !data.overtime){ outAdj = CAP; } // 야근 신청 없으면 22:00까지만 인정
+      dur = Math.max(0, outAdj - inM);
       const overlapStart = Math.max(inM, 11*60+30);
       const overlapEnd = Math.min(outAdj, 12*60+30);
       lunch = Math.max(0, overlapEnd - overlapStart);
@@ -457,11 +468,17 @@
         else actual = base;
       } else { actual = base; }
     }
-    const holidayWork = (plan===0 && actual!=null) ? actual : 0;
-    const isHolidayWorkDay = plan===0 && actual!=null;
-    const statusCounts = !isHolidayWorkDay && (actual!=null || leaveMin>0);
-    const dailyDiff = statusCounts ? (actual||0) + leaveMin - plan : 0;
-    return { plan, dur, lunch, dinner, actual, leaveMin, holidayWork, statusCounts, dailyDiff };
+    // 휴일근로(대체휴일 집계 대상)는 원래 계획근무가 없는 날(주말/공휴일)에 한함.
+    // 연차/반차/반반차로 계획근무가 줄어든 것은 별개(초과근무는 그냥 근무 현황에 가산).
+    const isCalendarWeekend = (dow === 0 || dow === 6);
+    const zeroPlanIsHolidayType = isCalendarWeekend || isPublicHoliday;
+    const holidayWork = (zeroPlanIsHolidayType && plan===0 && actual!=null) ? actual : 0;
+    const isHolidayWorkDay = zeroPlanIsHolidayType && plan===0 && actual!=null;
+
+    const hasLeaveSelected = data.leave==='full' || data.leave==='half' || data.leave==='quarter';
+    const statusCounts = !isHolidayWorkDay && (actual!=null || hasLeaveSelected);
+    const dailyDiff = statusCounts ? (actual||0) - plan : 0;
+    return { plan, dur, lunch, dinner, actual, leaveMin, holidayWork, statusCounts, dailyDiff, overtimeEligible };
   }
 
   // ---------------- To do (과제) 데이터 ----------------
@@ -751,6 +768,7 @@
           <td class="mono ${famDay ? 'family-cell' : ''}">${c.actual!=null ? minToStr(c.actual) : ''}</td>
           <td class="mono">${c.holidayWork>0 ? minToStr(c.holidayWork) : ''}</td>
           <td class="mono ${c.statusCounts ? (cumulative>=0?'diff-pos':'diff-neg') : ''}">${c.statusCounts ? minToStr(cumulative, true) : ''}</td>
+          <td>${c.overtimeEligible ? `<label class="overtime-check"><input type="checkbox" data-field="overtime" data-date="${dstr}" ${data.overtime ? 'checked' : ''}> 야근 신청</label>` : ''}</td>
         </tr>
       `);
     }
@@ -776,7 +794,7 @@
           <div class="card" style="margin-bottom:12px;">
             <h2>규칙</h2>
             <div class="legend">
-              <b>규칙</b> · 점심휴게: 11:30~12:30 중 근무한 만큼만 자동 차감 (예: 11:53 출근 → 37분) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · 연차는 하루치(8:00)로 인정되어 근무 현황에서 차감되지 않음 · <b>공휴일은 주말처럼 계획근무가 0으로 처리</b>되어 그냥 쉬면 근무 현황에 영향 없고, 그날 실제로 근무하면 휴일근로로 집계되어 대체휴일에 반영됨 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로+연차시간-계획근무)의 월 누적값 · 출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다
+              <b>규칙</b> · 점심휴게: 11:30~12:30 중 근무한 만큼만 자동 차감 (예: 11:53 출근 → 37분) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · <b>연차/반차/반반차는 계획근무에서 각각 8:00/4:00/2:00을 차감</b>하고 그만큼만 근무하면 근무 현황에 영향이 없으며, 남은 시간을 채우지 못하거나 더 일하면 그 차이가 근무 현황에 그대로 반영됨 · <b>공휴일은 주말처럼 계획근무가 0으로 처리</b>되어 그냥 쉬면 근무 현황에 영향 없고, 그날 실제로 근무하면 휴일근로로 집계되어 대체휴일에 반영됨 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로-계획근무)의 월 누적값 · 출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다
             </div>
           </div>
           <div class="table-wrap">
@@ -784,7 +802,7 @@
               <thead>
                 <tr>
                   <th>날짜</th><th>연차or휴일</th><th>계획근무</th><th>출근</th><th>퇴근</th>
-                  <th>체류시간</th><th>점심휴게</th><th>저녁휴게</th><th>실제근로</th><th>휴일근로</th><th>근무 현황</th>
+                  <th>체류시간</th><th>점심휴게</th><th>저녁휴게</th><th>실제근로</th><th>휴일근로</th><th>근무 현황</th><th>야근 신청</th>
                 </tr>
               </thead>
               <tbody>${rows.join('')}</tbody>
@@ -798,6 +816,7 @@
                   <td class="mono">${minToStr(totals.dinner)}</td>
                   <td class="mono">${minToStr(totals.actual)}</td>
                   <td class="mono">${minToStr(totals.holiday)}</td>
+                  <td></td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -847,11 +866,20 @@
       el.addEventListener('change', async (e)=>{
         const dstr = e.target.getAttribute('data-date');
         const field = e.target.getAttribute('data-field');
+        const data = getDayData(dstr);
+        if(field === 'overtime'){
+          data.overtime = e.target.checked;
+          await saveDay(dstr, data);
+          render();
+          return;
+        }
         const val = e.target.value;
-        if((field==='checkIn' || field==='checkOut') && val!=='' && !isValidTime24(val)){
+        if(field==='checkIn' && val!=='' && !isValidTime24(val)){
           e.target.classList.add('invalid'); return;
         }
-        const data = getDayData(dstr);
+        if(field==='checkOut' && val!=='' && !isValidCheckoutTime(val)){
+          e.target.classList.add('invalid'); return;
+        }
         data[field] = val;
         await saveDay(dstr, data);
         render();
