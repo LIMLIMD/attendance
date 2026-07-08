@@ -44,8 +44,17 @@
   .top-grid{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start;}
   @media(max-width:900px){.top-grid{grid-template-columns:1fr;}}
 
-  .todo-grid{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start;}
-  @media(max-width:900px){.todo-grid{grid-template-columns:1fr;}}
+  .todo-grid{display:flex;align-items:flex-start;gap:0;}
+  .todo-panel{flex:0 0 auto;min-width:260px;max-width:75vw;}
+  .todo-panel-right{flex:1 1 320px;min-width:280px;}
+  .todo-resizer{flex:0 0 auto;width:14px;align-self:stretch;cursor:col-resize;display:flex;align-items:center;justify-content:center;}
+  .todo-resizer::after{content:'';width:4px;height:44px;background:var(--line);border-radius:3px;transition:background .15s;}
+  .todo-resizer:hover::after, .todo-resizer.dragging::after{background:var(--accent);}
+  @media(max-width:900px){
+    .todo-grid{flex-direction:column;}
+    .todo-panel{width:100% !important;max-width:100%;}
+    .todo-resizer{display:none;}
+  }
 
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
   .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#7a8389;margin:0 0 10px 0;font-weight:700;}
@@ -233,7 +242,8 @@
     user: null, authView: 'login', loginError: '', signupError: '', changePinError: '',
     tab: 'attendance',
     todoCategories: [], todoItems: [], todoActiveCatId: null, todoCatEditing: null, todoItemEditing: null,
-    calendarYear: 2026, calendarMonth: 7, calendarSelectedDate: '', calendarEvents: []
+    calendarYear: 2026, calendarMonth: 7, calendarSelectedDate: '', calendarEvents: [], calendarEventEditing: null,
+    todoPanelWidth: 340
   };
 
   const todayObj = new Date();
@@ -250,6 +260,79 @@
 
   function escapeHtml(s){
     return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function toDatetimeLocalValue(iso){
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  // ---- To do 탭: 과제/캘린더 패널 폭 조절 ----
+  const PANEL_WIDTH_KEY = 'todo_panel_width';
+  function loadTodoPanelWidth(){
+    try{
+      const v = localStorage.getItem(PANEL_WIDTH_KEY);
+      if(v){ state.todoPanelWidth = Math.max(260, Math.min(Number(v), 900)); }
+    }catch(e){ /* ignore */ }
+  }
+  function saveTodoPanelWidth(){
+    try{ localStorage.setItem(PANEL_WIDTH_KEY, String(Math.round(state.todoPanelWidth))); }catch(e){ /* ignore */ }
+  }
+
+  let resizerDragging = false;
+  let resizerStartX = 0;
+  let resizerStartWidth = 0;
+  let resizerWindowListenersAdded = false;
+
+  function ensureResizerWindowListeners(){
+    if(resizerWindowListenersAdded) return;
+    resizerWindowListenersAdded = true;
+    function move(clientX){
+      if(!resizerDragging) return;
+      const left = document.getElementById('todoPanelLeft');
+      const grid = document.getElementById('todoGrid');
+      if(!left || !grid) return;
+      const delta = clientX - resizerStartX;
+      let newWidth = resizerStartWidth + delta;
+      const gridWidth = grid.getBoundingClientRect().width;
+      const maxW = Math.max(260, gridWidth - 300);
+      newWidth = Math.max(260, Math.min(newWidth, maxW));
+      left.style.width = newWidth + 'px';
+      state.todoPanelWidth = newWidth;
+    }
+    function endDrag(){
+      if(!resizerDragging) return;
+      resizerDragging = false;
+      const handle = document.getElementById('todoResizer');
+      if(handle) handle.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      saveTodoPanelWidth();
+    }
+    window.addEventListener('mousemove', e=>move(e.clientX));
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('touchmove', e=>{ if(resizerDragging && e.touches[0]) move(e.touches[0].clientX); }, { passive:true });
+    window.addEventListener('touchend', endDrag);
+  }
+
+  function attachResizerHandlers(){
+    ensureResizerWindowListeners();
+    const handle = document.getElementById('todoResizer');
+    const left = document.getElementById('todoPanelLeft');
+    if(!handle || !left) return;
+    handle.addEventListener('mousedown', e=>{
+      resizerDragging = true;
+      resizerStartX = e.clientX;
+      resizerStartWidth = left.getBoundingClientRect().width;
+      handle.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+    handle.addEventListener('touchstart', e=>{
+      if(!e.touches[0]) return;
+      resizerDragging = true;
+      resizerStartX = e.touches[0].clientX;
+      resizerStartWidth = left.getBoundingClientRect().width;
+      handle.classList.add('dragging');
+    }, { passive:true });
   }
   function timeToMin(t){ if(!t) return null; const p = t.split(':'); if(p.length<2) return null; const h=Number(p[0]), mi=Number(p[1]); if(isNaN(h)||isNaN(mi)) return null; return h*60+mi; }
   function isValidTime24(v){ return /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(v); }
@@ -470,6 +553,15 @@
       .insert({ user_id: state.user.id, title, location: location || null, start_at: startAt, end_at: endAt, all_day: !!allDay })
       .select('id,title,location,start_at,end_at,all_day').single();
     if(!error && data){ state.calendarEvents.push(data); flashSave(); }
+  }
+
+  async function updateCalendarEvent(id, fields){
+    if(!supabase || !state.user) return;
+    const idx = state.calendarEvents.findIndex(e=>e.id===id);
+    if(idx===-1) return;
+    Object.assign(state.calendarEvents[idx], fields);
+    const { error } = await supabase.from('calendar_events').update(fields).eq('id', id);
+    if(!error) flashSave();
   }
 
   async function deleteCalendarEvent(id){
@@ -842,6 +934,38 @@
     `;
   }
 
+  function calEventListItemHtml(e){
+    const editing = state.calendarEventEditing === e.id;
+    if(!editing){
+      const s = new Date(e.start_at), en = new Date(e.end_at);
+      const timeStr = e.all_day ? '종일' : `${pad(s.getHours())}:${pad(s.getMinutes())} ~ ${pad(en.getHours())}:${pad(en.getMinutes())}`;
+      return `
+        <div class="cal-event-list-item">
+          <div class="meta"><span class="t">${escapeHtml(e.title)}</span>${timeStr}${e.location ? ' · '+escapeHtml(e.location) : ''}</div>
+          <div class="todo-item-actions">
+            <button class="todo-icon-btn" data-ev-edit="${e.id}" title="수정">✎</button>
+            <button class="todo-icon-btn danger" data-ev-delete="${e.id}" title="삭제">×</button>
+          </div>
+        </div>
+      `;
+    }
+    const startDateOnly = e.start_at.slice(0,10);
+    const endDateOnly = e.end_at.slice(0,10);
+    return `
+      <div class="cal-event-list-item" style="flex-direction:column;align-items:stretch;gap:6px;padding:10px 2px;">
+        <input type="text" class="ev-edit-title" data-ev="${e.id}" value="${escapeHtml(e.title)}" maxlength="80" placeholder="제목">
+        <input type="text" class="ev-edit-location" data-ev="${e.id}" value="${escapeHtml(e.location||'')}" maxlength="80" placeholder="장소 (선택)">
+        <div class="cal-allday-row"><input type="checkbox" class="ev-edit-allday" data-ev="${e.id}" ${e.all_day?'checked':''}><label>종일</label></div>
+        <input type="${e.all_day?'date':'datetime-local'}" class="ev-edit-start" data-ev="${e.id}" value="${e.all_day?startDateOnly:toDatetimeLocalValue(e.start_at)}">
+        <input type="${e.all_day?'date':'datetime-local'}" class="ev-edit-end" data-ev="${e.id}" value="${e.all_day?endDateOnly:toDatetimeLocalValue(e.end_at)}">
+        <div class="todo-item-actions" style="justify-content:flex-end;">
+          <button class="todo-icon-btn" data-ev-save="${e.id}" title="저장">✓</button>
+          <button class="todo-icon-btn danger" data-ev-cancel="${e.id}" title="취소">×</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderCalendarPanel(){
     const y = state.calendarYear, m = state.calendarMonth;
     const nDays = daysInMonth(y,m);
@@ -894,16 +1018,7 @@
       </div>
     ` : '';
 
-    const listHtml = dayEventsAll.map(e=>{
-      const s = new Date(e.start_at), en = new Date(e.end_at);
-      const timeStr = e.all_day ? '종일' : `${pad(s.getHours())}:${pad(s.getMinutes())} ~ ${pad(en.getHours())}:${pad(en.getMinutes())}`;
-      return `
-        <div class="cal-event-list-item">
-          <div class="meta"><span class="t">${escapeHtml(e.title)}</span>${timeStr}${e.location ? ' · '+escapeHtml(e.location) : ''}</div>
-          <button class="cal-event-del" data-event="${e.id}" title="삭제">×</button>
-        </div>
-      `;
-    }).join('') || `<div class="todo-empty">이 날짜에 일정이 없어요.</div>`;
+    const listHtml = dayEventsAll.map(e=>calEventListItemHtml(e)).join('') || `<div class="todo-empty">이 날짜에 일정이 없어요.</div>`;
 
     return `
       <div class="card">
@@ -940,14 +1055,16 @@
 
   function renderTodoHtml(){
     return `
-      <div class="todo-grid">
-        <div>${renderTaskPanel()}</div>
-        <div>${renderCalendarPanel()}</div>
+      <div class="todo-grid" id="todoGrid">
+        <div class="todo-panel" id="todoPanelLeft" style="width:${state.todoPanelWidth}px;">${renderTaskPanel()}</div>
+        <div class="todo-resizer" id="todoResizer" title="드래그해서 폭 조절"></div>
+        <div class="todo-panel-right">${renderCalendarPanel()}</div>
       </div>
     `;
   }
 
   function attachTodoHandlers(){
+    attachResizerHandlers();
     const newCatInput = document.getElementById('newCategoryInput');
     const addCatBtn = document.getElementById('addCategoryBtn');
     async function doAddCategory(){
@@ -1100,10 +1217,62 @@
       });
     }
 
-    document.querySelectorAll('.cal-event-del, .cal-event-bar, .cal-allday-chip').forEach(el=>{
+    document.querySelectorAll('.cal-event-bar, .cal-allday-chip').forEach(el=>{
       el.addEventListener('click', ()=>{
         const id = el.getAttribute('data-event');
         if(id) deleteCalendarEvent(id);
+      });
+    });
+
+    document.querySelectorAll('[data-ev-edit]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ state.calendarEventEditing = btn.getAttribute('data-ev-edit'); render(); });
+    });
+    document.querySelectorAll('[data-ev-cancel]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ state.calendarEventEditing = null; render(); });
+    });
+    document.querySelectorAll('[data-ev-delete]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ deleteCalendarEvent(btn.getAttribute('data-ev-delete')); });
+    });
+    document.querySelectorAll('.ev-edit-allday').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const row = cb.closest('.cal-event-list-item');
+        const startEl = row.querySelector('.ev-edit-start');
+        const endEl = row.querySelector('.ev-edit-end');
+        if(cb.checked){
+          startEl.type = 'date'; startEl.value = startEl.value.slice(0,10);
+          endEl.type = 'date'; endEl.value = endEl.value.slice(0,10);
+        } else {
+          const sDate = startEl.value || state.calendarSelectedDate;
+          const eDate = endEl.value || state.calendarSelectedDate;
+          startEl.type = 'datetime-local'; startEl.value = `${sDate}T09:00`;
+          endEl.type = 'datetime-local'; endEl.value = `${eDate}T10:00`;
+        }
+      });
+    });
+    document.querySelectorAll('[data-ev-save]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-ev-save');
+        const row = btn.closest('.cal-event-list-item');
+        const title = row.querySelector('.ev-edit-title').value.trim();
+        const location = row.querySelector('.ev-edit-location').value.trim();
+        const allDay = row.querySelector('.ev-edit-allday').checked;
+        const startVal = row.querySelector('.ev-edit-start').value;
+        const endVal = row.querySelector('.ev-edit-end').value;
+        if(!title || !startVal || !endVal) return;
+        let startIso, endIso;
+        if(allDay){
+          startIso = new Date(startVal + 'T00:00:00').toISOString();
+          endIso = new Date(endVal + 'T23:59:59').toISOString();
+        } else {
+          startIso = new Date(startVal).toISOString();
+          endIso = new Date(endVal).toISOString();
+        }
+        btn.disabled = true;
+        await updateCalendarEvent(id, { title, location: location || null, all_day: allDay, start_at: startIso, end_at: endIso });
+        await loadCalendarEvents();
+        btn.disabled = false;
+        state.calendarEventEditing = null;
+        render();
       });
     });
   }
@@ -1158,6 +1327,7 @@
   }
 
   (async function init(){
+    loadTodoPanelWidth();
     const session = loadSession();
     if(session && session.id){
       state.user = session;
