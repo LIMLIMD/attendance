@@ -546,17 +546,24 @@
         times.push(pad(Number(mm[1])) + ':' + mm[2]);
       }
       const status = b.status || '';
-      let leave = 'none', checkIn = '', checkOut = '';
-      if(status.includes('연차')) leave = 'full';
-      else if(status.includes('반반차')) leave = 'quarter';
+      let leave = 'none';
+      if(status.includes('반반차')) leave = 'quarter';
       else if(status.includes('반차')) leave = 'half';
+      else if(status.includes('연차')) leave = 'full';
       else if(status.includes('공휴일')) leave = 'holiday';
-      else if(status.includes('휴일')){
-        continue; // 주휴일 등 근무 없는 날은 건너뜀 (기본 상태 유지)
-      } else {
-        if(times.length >= 1) checkIn = times[0];
+
+      // 상태 텍스트와 무관하게 실제 시간이 있으면 항상 인식 (반차/연차/공휴일이어도 실제 근무 시간이 있을 수 있음)
+      const hasRealTime = times.length >= 1 && !(times.length >= 2 && times[0]==='00:00' && times[1]==='00:00');
+      let checkIn = '', checkOut = '';
+      if(hasRealTime){
+        checkIn = times[0] || '';
         if(times.length >= 2 && times[1] !== '00:00') checkOut = times[1];
       }
+
+      // "주휴일"처럼 연차/공휴일도 아니고 실제 근무 시간도 없는 순수 휴무일만 건너뜀
+      const isPureRestDay = leave === 'none' && status.includes('휴일') && !hasRealTime;
+      if(isPureRestDay) continue;
+
       results.push({
         year: b.year, month: b.month, day: b.day, status,
         leave, checkIn, checkOut, include: true
