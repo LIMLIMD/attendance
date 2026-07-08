@@ -536,7 +536,7 @@
     }
     if(current) blocks.push(current);
 
-    const results = [];
+    const raw = [];
     for(const b of blocks){
       const joined = b.detailLines.join(' ');
       const times = [];
@@ -554,21 +554,38 @@
 
       // 상태 텍스트와 무관하게 실제 시간이 있으면 항상 인식 (반차/연차/공휴일이어도 실제 근무 시간이 있을 수 있음)
       const hasRealTime = times.length >= 1 && !(times.length >= 2 && times[0]==='00:00' && times[1]==='00:00');
-      let checkIn = '', checkOut = '';
-      if(hasRealTime){
-        checkIn = times[0] || '';
-        if(times.length >= 2 && times[1] !== '00:00') checkOut = times[1];
-      }
 
       // "주휴일"처럼 연차/공휴일도 아니고 실제 근무 시간도 없는 순수 휴무일만 건너뜀
       const isPureRestDay = leave === 'none' && status.includes('휴일') && !hasRealTime;
       if(isPureRestDay) continue;
 
-      results.push({
-        year: b.year, month: b.month, day: b.day, status,
-        leave, checkIn, checkOut, include: true
-      });
+      raw.push({ year: b.year, month: b.month, day: b.day, status, leave, times, hasRealTime });
     }
+
+    // 붙여넣은 기록 중 가장 최근 날짜를 찾음 - "퇴근 00:00 = 아직 퇴근 안 함" 규칙은 그 날짜에만 적용
+    let latestKey = '';
+    for(const r of raw){
+      const k = dateKey(r.year, r.month, r.day);
+      if(k > latestKey) latestKey = k;
+    }
+
+    const results = raw.map(r=>{
+      const k = dateKey(r.year, r.month, r.day);
+      let checkIn = '', checkOut = '';
+      if(r.hasRealTime){
+        checkIn = r.times[0] || '';
+        if(r.times.length >= 2){
+          const co = r.times[1];
+          if(co === '00:00' && k === latestKey){
+            checkOut = ''; // 가장 최근 날짜만 아직 퇴근 안 한 것으로 처리
+          } else {
+            checkOut = co;
+          }
+        }
+      }
+      return { year: r.year, month: r.month, day: r.day, status: r.status, leave: r.leave, checkIn, checkOut, include: true };
+    });
+
     // 최신 날짜가 먼저 나오는 원문 순서를 날짜 오름차순으로 정렬
     results.sort((a,b)=> dateKey(a.year,a.month,a.day).localeCompare(dateKey(b.year,b.month,b.day)));
     return results;
