@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>근태 관리</title>
+<title>Aiden</title>
 <style>
   :root{
     --ink:#1B2430;
@@ -18,6 +18,7 @@
     --input-bg-hover:#FFE9B3;
     --plus:#0F6E5B;
     --minus:#C0392B;
+    --amber:#E08E00;
     font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',Roboto,'Noto Sans',sans-serif;
   }
   *{box-sizing:border-box;}
@@ -26,9 +27,14 @@
 
   #app{background:var(--paper);padding:20px;min-height:100vh;}
 
-  .header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
   .header h1{font-size:19px;font-weight:700;letter-spacing:-0.01em;margin:0;}
   .header .sub{font-size:12px;color:#6b7680;margin-top:2px;}
+
+  .tab-nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:16px;width:fit-content;}
+  .tab-btn{border:none;background:none;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;color:#7a8389;cursor:pointer;}
+  .tab-btn.active{background:var(--accent);color:#fff;}
+  .tab-btn:hover:not(.active){background:var(--accent-soft);color:var(--accent);}
 
   .month-nav{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 6px;}
   .month-nav button{border:none;background:none;font-size:15px;cursor:pointer;color:var(--accent);width:28px;height:28px;border-radius:6px;}
@@ -56,10 +62,10 @@
   select.leave-input{width:82px;}
   input.time-input{width:78px;}
   input.time-input.invalid{border-color:var(--minus);background:#FFE1E1;}
-  input.time-input.live-preview{background:#D6EEF8;color:#98a3ab;border-color:#B9DCEB;}
-  input.time-input.live-preview:hover{background:#c9e6f4;}
   select.leave-input:hover, input.time-input:hover{background:var(--input-bg-hover);}
   select.leave-input:focus, input.time-input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  input.time-input.live-preview{background:#D6EEF8;color:#98a3ab;border-color:#B9DCEB;}
+  input.time-input.live-preview:hover{background:#c9e6f4;}
 
   .family-cell{background:#D6EEF8 !important;border-radius:4px;font-weight:700;color:#1B6E93;}
   .family-tag{font-size:9px;background:#D6EEF8;color:#1B6E93;border-radius:4px;padding:1px 4px;font-weight:700;vertical-align:middle;margin-left:2px;}
@@ -110,6 +116,29 @@
   .login-switch a{color:var(--accent);font-weight:700;text-decoration:none;}
   .login-switch a:hover{text-decoration:underline;}
   .login-hint{font-size:11px;color:#8b9298;margin-top:16px;line-height:1.6;}
+
+  .btn-primary{border:none;border-radius:7px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;white-space:nowrap;}
+  .btn-primary:hover{background:#0b5a4a;}
+  .btn-primary:disabled{background:#b7c3bf;cursor:default;}
+
+  .todo-cat-list{display:flex;flex-direction:column;gap:12px;}
+  .todo-row{display:grid;grid-template-columns:34px 132px 1fr 30px;gap:8px;align-items:center;padding:7px 2px;border-bottom:1px solid #EEF1F0;}
+  .todo-row:last-child{border-bottom:none;}
+  .todo-row input[type=date]{border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:12px;width:100%;color:var(--ink);}
+  .todo-row input[type=text]{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;width:100%;}
+  .todo-row input[type=text]:focus, .todo-row input[type=date]:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .todo-row input.todo-content-input.done{text-decoration:line-through;color:#b7bec2;}
+  .todo-empty{font-size:12.5px;color:#8b9298;padding:10px 2px;}
+  .todo-delete{border:none;background:none;color:#c7cdcb;font-size:16px;cursor:pointer;width:28px;height:28px;border-radius:6px;line-height:1;}
+  .todo-delete:hover{background:#FFE1E1;color:var(--minus);}
+
+  .status-toggle{width:26px;height:26px;border-radius:50%;border:2px solid #c7cdcb;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:transparent;padding:0;}
+  .status-toggle.status-in_progress{background:var(--amber);border-color:var(--amber);color:#fff;}
+  .status-toggle.status-done{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+  .new-cat-row{display:flex;gap:8px;}
+  .new-cat-row input{flex:1;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13.5px;}
+  .new-cat-row input:focus{outline:2px solid var(--accent);outline-offset:1px;}
 </style>
 </head>
 <body>
@@ -120,8 +149,7 @@
 
 <script>
 (function(){
-  // ---- Supabase 연결 정보: 아래 두 값을 채워주세요 ----
-  // Supabase 대시보드 > Project Settings > API 에서 확인할 수 있습니다.
+  // ---- Supabase 연결 정보 ----
   const SUPABASE_URL = 'https://tpjxiealovjlmyeqmupq.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_r5uArNLj0P4TBk8rPUnqqQ_hf-T2ZEC';
 
@@ -133,6 +161,8 @@
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차' };
   const MEAL_RATE = 9000;
   const SESSION_KEY = 'att_session_v1';
+  const STATUS_ORDER = ['pending','in_progress','done'];
+  const STATUS_ICON = { pending:'', in_progress:'●', done:'✓' };
 
   let state = {
     year: 2026,
@@ -142,7 +172,10 @@
     authView: 'login', // 'login' | 'signup' | 'changepin'
     loginError: '',
     signupError: '',
-    changePinError: ''
+    changePinError: '',
+    tab: 'attendance', // 'attendance' | 'todo'
+    todoCategories: [],
+    todoItems: []
   };
 
   const todayObj = new Date();
@@ -169,9 +202,6 @@
     const n = new Date();
     return pad(n.getHours()) + ':' + pad(n.getMinutes());
   }
-
-  // 출근은 입력됐지만 퇴근이 비어있으면, 지금 이 순간의 시각을 임시 퇴근시간으로
-  // 사용해서 계산에 반영한다 (실제로 저장되는 값은 아니고 화면 표시/계산용).
   function effectiveDayData(data){
     if(data.checkIn && !data.checkOut){
       return { leave: data.leave, checkIn: data.checkIn, checkOut: nowTimeStr(), _live: true };
@@ -179,7 +209,7 @@
     return data;
   }
 
-  // ---------------- Auth (이름 + 4자리 PIN, Supabase 테이블 기반) ----------------
+  // ---------------- Auth ----------------
 
   function loadSession(){
     try{
@@ -196,7 +226,7 @@
   }
 
   async function login(name, pin){
-    if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요. 코드 상단의 SUPABASE_URL / SUPABASE_ANON_KEY를 채워주세요.' };
+    if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요.' };
     if(!name){ return { ok:false, message:'이름을 입력해주세요.' }; }
     if(!/^\d{4}$/.test(pin)){ return { ok:false, message:'PIN은 숫자 4자리로 입력해주세요.' }; }
 
@@ -215,7 +245,7 @@
   }
 
   async function register(name, pin, pinConfirm){
-    if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요. 코드 상단의 SUPABASE_URL / SUPABASE_ANON_KEY를 채워주세요.' };
+    if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요.' };
     if(!name){ return { ok:false, message:'이름을 입력해주세요.' }; }
     if(!/^\d{4}$/.test(pin)){ return { ok:false, message:'PIN은 숫자 4자리로 입력해주세요.' }; }
     if(pin !== pinConfirm){ return { ok:false, message:'PIN이 서로 일치하지 않아요. 다시 확인해주세요.' }; }
@@ -234,7 +264,7 @@
   }
 
   async function changePin(name, oldPin, newPin, newPinConfirm){
-    if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요. 코드 상단의 SUPABASE_URL / SUPABASE_ANON_KEY를 채워주세요.' };
+    if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요.' };
     if(!name){ return { ok:false, message:'이름을 입력해주세요.' }; }
     if(!/^\d{4}$/.test(oldPin)){ return { ok:false, message:'기존 PIN은 숫자 4자리로 입력해주세요.' }; }
     if(!/^\d{4}$/.test(newPin)){ return { ok:false, message:'변경할 PIN은 숫자 4자리로 입력해주세요.' }; }
@@ -261,10 +291,12 @@
     clearSession();
     state.user = null;
     state.days = {};
+    state.todoCategories = [];
+    state.todoItems = [];
     render();
   }
 
-  // ---------------- 데이터 로드/저장 (Supabase) ----------------
+  // ---------------- 근태 데이터 ----------------
 
   async function loadMonth(){
     state.days = {};
@@ -298,24 +330,6 @@
     else console.error('save failed', error);
   }
 
-  let flashTimer=null;
-  let liveTick=null;
-  function startLiveTick(){
-    if(liveTick) return;
-    liveTick = setInterval(()=>{
-      const active = document.activeElement;
-      if(active && (active.tagName === 'INPUT' || active.tagName === 'SELECT')) return; // 입력 중이면 건드리지 않음
-      render();
-    }, 30000);
-  }
-  function flashSave(){
-    const el = document.getElementById('save-flag');
-    if(!el) return;
-    el.classList.add('show');
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(()=>el.classList.remove('show'), 900);
-  }
-
   function getDayData(dstr){
     if(!state.days[dstr]) state.days[dstr] = { leave:'none', checkIn:'', checkOut:'' };
     return state.days[dstr];
@@ -323,8 +337,8 @@
 
   function isFamilyDay(y, m, d){
     const dow = new Date(y, m-1, d).getDay();
-    if(dow !== 5) return false; // Friday only
-    return Math.ceil(d/7) === 4; // the 4th Friday of the month
+    if(dow !== 5) return false;
+    return Math.ceil(d/7) === 4;
   }
 
   function computeDay(dow, data, familyDay){
@@ -357,13 +371,89 @@
     return { plan, dur, lunch, dinner, actual, leaveMin, holidayWork, statusCounts, dailyDiff };
   }
 
-  // ---------------- 렌더링: 로그인 / 회원가입 화면 ----------------
+  // ---------------- To do 데이터 ----------------
+
+  async function loadTodos(){
+    state.todoCategories = [];
+    state.todoItems = [];
+    if(!supabase || !state.user) return;
+    const { data: cats } = await supabase
+      .from('todo_categories').select('id,name,sort_order')
+      .eq('user_id', state.user.id).order('sort_order', { ascending:true });
+    state.todoCategories = cats || [];
+    const { data: items } = await supabase
+      .from('todo_items').select('id,category_id,content,due_date,status')
+      .eq('user_id', state.user.id);
+    state.todoItems = items || [];
+  }
+
+  async function addCategory(name){
+    if(!supabase || !state.user || !name) return;
+    const maxOrder = state.todoCategories.reduce((mx,c)=>Math.max(mx, c.sort_order||0), 0);
+    const { data, error } = await supabase.from('todo_categories')
+      .insert({ user_id: state.user.id, name, sort_order: maxOrder+1 })
+      .select('id,name,sort_order').single();
+    if(!error && data){ state.todoCategories.push(data); flashSave(); }
+  }
+
+  async function addTodoItem(categoryId, content, dueDate){
+    if(!supabase || !state.user || !content) return;
+    const { data, error } = await supabase.from('todo_items')
+      .insert({ user_id: state.user.id, category_id: categoryId, content, due_date: dueDate || null, status:'pending' })
+      .select('id,category_id,content,due_date,status').single();
+    if(!error && data){ state.todoItems.push(data); flashSave(); }
+  }
+
+  async function updateTodoItem(itemId, fields){
+    if(!supabase || !state.user) return;
+    const item = state.todoItems.find(i=>i.id===itemId);
+    if(!item) return;
+    Object.assign(item, fields);
+    const { error } = await supabase.from('todo_items')
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq('id', itemId);
+    if(!error) flashSave();
+  }
+
+  async function deleteTodoItem(itemId){
+    if(!supabase || !state.user) return;
+    state.todoItems = state.todoItems.filter(i=>i.id!==itemId);
+    render();
+    await supabase.from('todo_items').delete().eq('id', itemId);
+  }
+
+  function cycleStatus(current){
+    const idx = STATUS_ORDER.indexOf(current);
+    return STATUS_ORDER[(idx+1) % STATUS_ORDER.length];
+  }
+
+  // ---------------- 저장 표시 / 실시간 갱신 ----------------
+
+  let flashTimer=null;
+  let liveTick=null;
+  function startLiveTick(){
+    if(liveTick) return;
+    liveTick = setInterval(()=>{
+      const active = document.activeElement;
+      if(active && (active.tagName === 'INPUT' || active.tagName === 'SELECT')) return;
+      render();
+    }, 30000);
+  }
+  function flashSave(){
+    const el = document.getElementById('save-flag');
+    if(!el) return;
+    el.classList.add('show');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(()=>el.classList.remove('show'), 900);
+  }
+
+  // ---------------- 렌더링: 로그인 / 회원가입 / PIN변경 ----------------
 
   function renderLogin(){
     document.getElementById('app').innerHTML = `
       <div class="login-wrap">
         <div class="login-card">
-          <h1>근태 관리</h1>
+          <h1>Aiden</h1>
           <div class="desc">이름과 4자리 PIN으로 로그인하세요.</div>
           <div class="login-field">
             <label>이름</label>
@@ -397,7 +487,7 @@
         state.user = res.user;
         state.loginError = '';
         saveSession(res.user);
-        await loadMonth();
+        await Promise.all([loadMonth(), loadTodos()]);
         render();
       } else {
         state.loginError = res.message;
@@ -468,7 +558,7 @@
         state.user = res.user;
         state.signupError = '';
         saveSession(res.user);
-        await loadMonth();
+        await Promise.all([loadMonth(), loadTodos()]);
         render();
       } else {
         state.signupError = res.message;
@@ -543,7 +633,7 @@
         state.user = res.user;
         state.changePinError = '';
         saveSession(res.user);
-        await loadMonth();
+        await Promise.all([loadMonth(), loadTodos()]);
         render();
       } else {
         state.changePinError = res.message;
@@ -564,10 +654,9 @@
     });
   }
 
-  // ---------------- 렌더링: 메인 앱 ----------------
+  // ---------------- 렌더링: 근태 관리 탭 ----------------
 
-  function renderApp(){
-    startLiveTick();
+  function renderAttendanceHtml(){
     const y = state.year, m = state.month;
     const nDays = daysInMonth(y,m);
     const rows = [];
@@ -593,18 +682,20 @@
 
       const rowClass = dow===6 ? 'weekend-sat' : (dow===0 ? 'weekend-sun' : '');
       const weekdayLabel = ['일','월','화','수','목','금','토'][dow];
+      const tabIn = d*2 - 1;
+      const tabOut = d*2;
 
       rows.push(`
         <tr class="${rowClass}" data-date="${dstr}">
           <td class="date-cell mono">${d}일(${weekdayLabel})${famDay ? ' <span class="family-tag">FD</span>' : ''}</td>
           <td>
-            <select class="leave-input" data-field="leave" data-date="${dstr}">
+            <select class="leave-input" data-field="leave" data-date="${dstr}" tabindex="-1">
               ${Object.keys(LEAVE_MIN).map(k=>`<option value="${k}" ${data.leave===k?'selected':''}>${LEAVE_LABEL[k]}</option>`).join('')}
             </select>
           </td>
           <td class="mono">${c.plan>0 ? minToStr(c.plan) : '<span class="muted">-</span>'}</td>
-          <td><input class="time-input" type="text" inputmode="numeric" placeholder="09:00" maxlength="5" data-field="checkIn" data-date="${dstr}" value="${data.checkIn||''}"></td>
-          <td><input class="time-input${isLive ? ' live-preview' : ''}" type="text" inputmode="numeric" placeholder="18:00" maxlength="5" data-field="checkOut" data-date="${dstr}" value="${isLive ? effData.checkOut : (data.checkOut||'')}"></td>
+          <td><input class="time-input" type="text" inputmode="numeric" placeholder="09:00" maxlength="5" data-field="checkIn" data-date="${dstr}" value="${data.checkIn||''}" tabindex="${tabIn}"></td>
+          <td><input class="time-input${isLive ? ' live-preview' : ''}" type="text" inputmode="numeric" placeholder="18:00" maxlength="5" data-field="checkOut" data-date="${dstr}" value="${isLive ? effData.checkOut : (data.checkOut||'')}" tabindex="${tabOut}"></td>
           <td class="mono">${c.dur!=null ? minToStr(c.dur) : ''}</td>
           <td class="mono">${c.dur!=null ? minToStr(c.lunch) : ''}</td>
           <td class="mono">${c.dur!=null ? minToStr(c.dinner) : ''}</td>
@@ -630,28 +721,13 @@
     const balanceMax = 8*60*3;
     const pct = Math.max(-100, Math.min(100, (balanceMinutes/balanceMax)*100));
 
-    document.getElementById('app').innerHTML = `
-      <div class="header">
-        <div>
-          <h1>근태 관리</h1>
-          <div class="sub">출퇴근 시간을 입력하면 근무 현황이 자동으로 계산돼요 · <span id="save-flag" class="save-flag">저장됨</span></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <div class="user-chip">${state.user.name}님 <button id="logoutBtn">로그아웃</button></div>
-          <div class="month-nav">
-            <button id="prev-month">‹</button>
-            <span class="label mono">${y}년 ${m}월</span>
-            <button id="next-month">›</button>
-          </div>
-        </div>
-      </div>
-
+    return `
       <div class="top-grid">
         <div>
           <div class="card" style="margin-bottom:12px;">
             <h2>규칙</h2>
             <div class="legend">
-              <b>규칙</b> · 점심휴게: 11:30~12:30 중 근무한 만큼만 자동 차감 (예: 11:53 출근 → 37분) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로+연차시간-계획근무)의 월 누적값이며, 계획근무가 없는 날(휴일)에 발생한 실제근로는 근무현황에 반영되지 않고 8시간=1일 기준으로 대체휴일에만 반영됨
+              <b>규칙</b> · 점심휴게: 11:30~12:30 중 근무한 만큼만 자동 차감 (예: 11:53 출근 → 37분) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로+연차시간-계획근무)의 월 누적값이며, 계획근무가 없는 날(휴일)에 발생한 실제근로는 근무현황에 반영되지 않고 8시간=1일 기준으로 대체휴일에만 반영됨 · 출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다
             </div>
           </div>
 
@@ -712,23 +788,9 @@
         </div>
       </div>
     `;
-
-    attachHandlers();
   }
 
-  function render(){
-    if(!state.user){
-      if(state.authView === 'signup') renderSignup();
-      else if(state.authView === 'changepin') renderChangePin();
-      else renderLogin();
-      return;
-    }
-    renderApp();
-  }
-
-  function attachHandlers(){
-    document.getElementById('logoutBtn').onclick = logout;
-
+  function attachAttendanceHandlers(){
     document.getElementById('prev-month').onclick = async ()=>{
       state.month -= 1;
       if(state.month<1){ state.month=12; state.year -=1; }
@@ -771,11 +833,190 @@
     });
   }
 
+  // ---------------- 렌더링: To do list 탭 ----------------
+
+  function renderTodoHtml(){
+    if(state.todoCategories.length === 0){
+      return `
+        <div class="card" style="margin-bottom:12px;">
+          <h2>소분류 추가</h2>
+          <div class="new-cat-row">
+            <input type="text" id="newCategoryInput" placeholder="예: 프로젝트A" maxlength="40">
+            <button id="addCategoryBtn" class="btn-primary">추가</button>
+          </div>
+        </div>
+        <div class="card"><div class="todo-empty">아직 소분류가 없어요. 위에서 하나 추가해보세요.</div></div>
+      `;
+    }
+
+    const cats = state.todoCategories.slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+    const catBlocks = cats.map(cat=>{
+      const items = state.todoItems
+        .filter(i=>i.category_id === cat.id)
+        .slice()
+        .sort((a,b)=>{
+          if(!a.due_date && !b.due_date) return 0;
+          if(!a.due_date) return 1;
+          if(!b.due_date) return -1;
+          return a.due_date.localeCompare(b.due_date);
+        });
+
+      const itemRows = items.map(item=>`
+        <div class="todo-row" data-item="${item.id}">
+          <button class="status-toggle status-${item.status}" data-item="${item.id}" title="상태 변경">${STATUS_ICON[item.status]}</button>
+          <input type="date" class="todo-due-edit" data-item="${item.id}" value="${item.due_date || ''}">
+          <input type="text" class="todo-content-edit${item.status==='done' ? ' done' : ''}" data-item="${item.id}" value="${item.content.replace(/"/g,'&quot;')}" maxlength="200">
+          <button class="todo-delete" data-item="${item.id}" title="삭제">×</button>
+        </div>
+      `).join('') || `<div class="todo-empty">할 일이 없어요.</div>`;
+
+      return `
+        <div class="card todo-category" data-cat="${cat.id}" style="margin-bottom:12px;">
+          <h2>${cat.name}</h2>
+          <div class="todo-cat-items">${itemRows}</div>
+          <div class="todo-row todo-add-row">
+            <span></span>
+            <input type="date" class="todo-due-input" data-cat="${cat.id}">
+            <input type="text" class="todo-content-input" data-cat="${cat.id}" placeholder="할 일을 입력하고 Enter" maxlength="200">
+            <button class="btn-primary todo-add-btn" data-cat="${cat.id}" style="padding:6px 10px;">추가</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="card" style="margin-bottom:12px;">
+        <h2>소분류 추가</h2>
+        <div class="new-cat-row">
+          <input type="text" id="newCategoryInput" placeholder="예: 프로젝트A" maxlength="40">
+          <button id="addCategoryBtn" class="btn-primary">추가</button>
+        </div>
+      </div>
+      <div class="todo-cat-list">${catBlocks}</div>
+    `;
+  }
+
+  function attachTodoHandlers(){
+    const newCatInput = document.getElementById('newCategoryInput');
+    const addCatBtn = document.getElementById('addCategoryBtn');
+    async function doAddCategory(){
+      const name = newCatInput.value.trim();
+      if(!name) return;
+      addCatBtn.disabled = true;
+      await addCategory(name);
+      addCatBtn.disabled = false;
+      render();
+    }
+    if(addCatBtn) addCatBtn.addEventListener('click', doAddCategory);
+    if(newCatInput) newCatInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doAddCategory(); });
+
+    document.querySelectorAll('.status-toggle').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-item');
+        const item = state.todoItems.find(i=>i.id===id);
+        if(!item) return;
+        const next = cycleStatus(item.status);
+        await updateTodoItem(id, { status: next });
+        render();
+      });
+    });
+
+    document.querySelectorAll('.todo-due-edit').forEach(el=>{
+      el.addEventListener('change', async ()=>{
+        const id = el.getAttribute('data-item');
+        await updateTodoItem(id, { due_date: el.value || null });
+        render();
+      });
+    });
+
+    document.querySelectorAll('.todo-content-edit').forEach(el=>{
+      el.addEventListener('change', async ()=>{
+        const id = el.getAttribute('data-item');
+        const val = el.value.trim();
+        if(!val) return;
+        await updateTodoItem(id, { content: val });
+        render();
+      });
+    });
+
+    document.querySelectorAll('.todo-delete').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-item');
+        deleteTodoItem(id);
+      });
+    });
+
+    document.querySelectorAll('.todo-add-btn').forEach(btn=>{
+      const catId = btn.getAttribute('data-cat');
+      const contentEl = document.querySelector(`.todo-content-input[data-cat="${catId}"]`);
+      const dueEl = document.querySelector(`.todo-due-input[data-cat="${catId}"]`);
+      async function doAdd(){
+        const content = contentEl.value.trim();
+        if(!content) return;
+        btn.disabled = true;
+        await addTodoItem(catId, content, dueEl.value);
+        btn.disabled = false;
+        render();
+      }
+      btn.addEventListener('click', doAdd);
+      contentEl.addEventListener('keydown', e=>{ if(e.key==='Enter') doAdd(); });
+    });
+  }
+
+  // ---------------- 렌더링: 전체 앱(탭 포함) ----------------
+
+  function renderApp(){
+    startLiveTick();
+    document.getElementById('app').innerHTML = `
+      <div class="header">
+        <div>
+          <h1>Aiden</h1>
+          <div class="sub">${state.tab==='attendance' ? '출퇴근 시간을 입력하면 근무 현황이 자동으로 계산돼요' : '소분류별로 할 일을 관리하세요'} · <span id="save-flag" class="save-flag">저장됨</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="user-chip">${state.user.name}님 <button id="logoutBtn">로그아웃</button></div>
+          ${state.tab==='attendance' ? `
+          <div class="month-nav">
+            <button id="prev-month">‹</button>
+            <span class="label mono">${state.year}년 ${state.month}월</span>
+            <button id="next-month">›</button>
+          </div>` : ''}
+        </div>
+      </div>
+
+      <div class="tab-nav">
+        <button class="tab-btn ${state.tab==='attendance' ? 'active' : ''}" id="tabAttendance">근태 관리</button>
+        <button class="tab-btn ${state.tab==='todo' ? 'active' : ''}" id="tabTodo">To do list</button>
+      </div>
+
+      <div id="tabContent">
+        ${state.tab==='attendance' ? renderAttendanceHtml() : renderTodoHtml()}
+      </div>
+    `;
+
+    document.getElementById('logoutBtn').onclick = logout;
+    document.getElementById('tabAttendance').onclick = ()=>{ state.tab='attendance'; render(); };
+    document.getElementById('tabTodo').onclick = ()=>{ state.tab='todo'; render(); };
+
+    if(state.tab==='attendance') attachAttendanceHandlers();
+    else attachTodoHandlers();
+  }
+
+  function render(){
+    if(!state.user){
+      if(state.authView === 'signup') renderSignup();
+      else if(state.authView === 'changepin') renderChangePin();
+      else renderLogin();
+      return;
+    }
+    renderApp();
+  }
+
   (async function init(){
     const session = loadSession();
     if(session && session.id){
       state.user = session;
-      await loadMonth();
+      await Promise.all([loadMonth(), loadTodos()]);
     }
     render();
   })();
