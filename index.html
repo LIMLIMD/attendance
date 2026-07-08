@@ -111,6 +111,13 @@
   .balance-label{margin-top:6px;font-size:12px;color:#5a6469;display:flex;justify-content:space-between;}
 
   .legend{font-size:11px;color:#8b9298;margin-top:10px;line-height:1.6;}
+  .paste-textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;font-family:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;resize:vertical;}
+  .paste-textarea:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .paste-preview{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:10px;}
+  .paste-row{display:grid;grid-template-columns:36px 100px 96px 1fr 1fr;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid #EEF1F0;font-size:12px;}
+  .paste-row:last-child{border-bottom:none;}
+  .paste-row.paste-head{background:#EEF2F1;font-weight:700;color:#5a6469;}
+  .paste-row select, .paste-row input[type=text]{border:1px solid var(--line);border-radius:6px;padding:4px 5px;font-size:12px;width:100%;text-align:center;}
   .legend b{color:#5a6469;}
 
   .save-flag{font-size:11px;color:var(--accent);opacity:0;transition:opacity .3s;}
@@ -251,7 +258,8 @@
     tab: 'attendance',
     todoCategories: [], todoItems: [], todoActiveCatId: null, todoCatEditing: null, todoItemEditing: null,
     calendarYear: 2026, calendarMonth: 7, calendarSelectedDate: '', calendarEvents: [], calendarEventEditing: null,
-    todoPanelWidth: 340
+    todoPanelWidth: 340,
+    pastePending: []
   };
 
   const todayObj = new Date();
@@ -454,9 +462,9 @@
       overtimeEligible = outAdj > CAP;
       if(overtimeEligible && !data.overtime){ outAdj = CAP; } // 연장신청 없으면 22:00까지만 인정
       dur = Math.max(0, outAdj - inM);
-      const overlapStart = Math.max(inM, 11*60+30);
-      const overlapEnd = Math.min(outAdj, 12*60+30);
-      lunch = Math.max(0, overlapEnd - overlapStart);
+      if(dur >= 9*60) lunch = 60;
+      else if(dur >= 4*60+30) lunch = 30;
+      else lunch = 0;
       dinner = dur >= (11*60+30) ? 30 : 0;
       const base = dur - lunch - dinner;
       if(familyDay){
@@ -476,6 +484,73 @@
     const statusCounts = !isHolidayWorkDay && (actual!=null || hasLeaveSelected);
     const dailyDiff = statusCounts ? (actual||0) - plan : 0;
     return { plan, dur, lunch, dinner, actual, leaveMin, holidayWork, statusCounts, dailyDiff, overtimeEligible };
+  }
+
+  // ---------------- 출퇴근 기록 붙여넣기 인식 ----------------
+
+  function parsePasteText(text){
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+    const dateLineRe = /^(\d{4})-(\d{2})-(\d{2})/;
+    const blocks = [];
+    let current = null;
+    for(const line of lines){
+      const m = line.match(dateLineRe);
+      if(m){
+        if(current) blocks.push(current);
+        const parts = line.split('\t').map(s=>s.trim()).filter(Boolean);
+        current = {
+          year: Number(m[1]), month: Number(m[2]), day: Number(m[3]),
+          status: parts.length>=2 ? parts[1] : '',
+          detailLines: []
+        };
+      } else if(current){
+        current.detailLines.push(line);
+      }
+    }
+    if(current) blocks.push(current);
+
+    const results = [];
+    for(const b of blocks){
+      const joined = b.detailLines.join(' ');
+      const times = [];
+      const timeRe = /([01]?\d|2[0-3]):([0-5]\d)/g;
+      let mm;
+      while((mm = timeRe.exec(joined)) !== null){
+        times.push(pad(Number(mm[1])) + ':' + mm[2]);
+      }
+      const status = b.status || '';
+      let leave = 'none', checkIn = '', checkOut = '';
+      if(status.includes('연차')) leave = 'full';
+      else if(status.includes('반반차')) leave = 'quarter';
+      else if(status.includes('반차')) leave = 'half';
+      else if(status.includes('공휴일')) leave = 'holiday';
+      else if(status.includes('휴일')){
+        continue; // 주휴일 등 근무 없는 날은 건너뜀 (기본 상태 유지)
+      } else {
+        if(times.length >= 1) checkIn = times[0];
+        if(times.length >= 2 && times[1] !== '00:00') checkOut = times[1];
+      }
+      results.push({
+        year: b.year, month: b.month, day: b.day, status,
+        leave, checkIn, checkOut, include: true
+      });
+    }
+    // 최신 날짜가 먼저 나오는 원문 순서를 날짜 오름차순으로 정렬
+    results.sort((a,b)=> dateKey(a.year,a.month,a.day).localeCompare(dateKey(b.year,b.month,b.day)));
+    return results;
+  }
+
+  async function applyPasteRow(row){
+    if(!supabase || !state.user) return;
+    const dstr = dateKey(row.year, row.month, row.day);
+    const { error } = await supabase.from('att_days').upsert({
+      user_id: state.user.id, date_key: dstr, leave: row.leave,
+      check_in: row.checkIn, check_out: row.checkOut, overtime: false,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,date_key' });
+    if(!error && row.year === state.year && row.month === state.month){
+      state.days[dstr] = { leave: row.leave, checkIn: row.checkIn, checkOut: row.checkOut, overtime: false };
+    }
   }
 
   // ---------------- To do (과제) 데이터 ----------------
@@ -724,6 +799,32 @@
 
   // ---------------- 렌더링: 근태 관리 탭 ----------------
 
+  function renderPastePreview(){
+    if(state.pastePending.length === 0) return '';
+    const rows = state.pastePending.map((r,i)=>`
+      <div class="paste-row">
+        <input type="checkbox" class="paste-include" data-idx="${i}" ${r.include?'checked':''}>
+        <span class="mono">${dateKey(r.year,r.month,r.day)}</span>
+        <select class="paste-leave" data-idx="${i}">
+          ${Object.keys(LEAVE_MIN).map(k=>`<option value="${k}" ${r.leave===k?'selected':''}>${LEAVE_LABEL[k]}</option>`).join('')}
+        </select>
+        <input type="text" inputmode="numeric" class="paste-time mono" data-idx="${i}" data-f="checkIn" value="${r.checkIn||''}" placeholder="09:00">
+        <input type="text" inputmode="numeric" class="paste-time mono" data-idx="${i}" data-f="checkOut" value="${r.checkOut||''}" placeholder="18:00">
+      </div>
+    `).join('');
+    return `
+      <div class="paste-preview">
+        <div class="paste-row paste-head">
+          <span>포함</span><span>날짜</span><span>연차/휴일</span><span>출근</span><span>퇴근</span>
+        </div>
+        ${rows}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn-primary" id="pasteApplyBtn">선택한 항목 적용 (${state.pastePending.filter(r=>r.include).length}건)</button>
+      </div>
+    `;
+  }
+
   function renderAttendanceHtml(){
     const y = state.year, m = state.month;
     const nDays = daysInMonth(y,m);
@@ -789,9 +890,18 @@
       <div class="top-grid">
         <div>
           <div class="card" style="margin-bottom:12px;">
+            <h2>출퇴근 기록 붙여넣기</h2>
+            <textarea id="pasteText" class="paste-textarea" rows="6" placeholder="복사한 출퇴근 기록을 여기에 붙여넣으세요"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button class="btn-primary" id="pasteParseBtn">인식하기</button>
+              <button class="btn-secondary" id="pasteClearBtn">지우기</button>
+            </div>
+            <div id="pastePreviewWrap">${renderPastePreview()}</div>
+          </div>
+          <div class="card" style="margin-bottom:12px;">
             <h2>규칙</h2>
             <div class="legend">
-              <b>규칙</b> · 점심휴게: 11:30~12:30 중 근무한 만큼만 자동 차감 (예: 11:53 출근 → 37분) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · <b>퇴근이 22:00을 넘으면 연장신청 체크박스가 나타나며</b>, 체크하지 않으면 22:00까지만 근무로 인정되고 체크하면 실제 퇴근 시각까지 전부 인정됨 · <b>연차/반차/반반차는 계획근무에서 각각 8:00/4:00/2:00을 차감</b>하고 그만큼만 근무하면 근무 현황에 영향이 없으며, 남은 시간을 채우지 못하거나 더 일하면 그 차이가 근무 현황에 그대로 반영됨 · <b>공휴일은 주말처럼 계획근무가 0으로 처리</b>되어 그냥 쉬면 근무 현황에 영향 없고, 그날 실제로 근무하면 휴일근로로 집계되어 대체휴일에 반영됨 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로-계획근무)의 월 누적값 · 출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다
+              <b>규칙</b> · <b>점심휴게: 체류시간 4:30 이상이면 30분, 9:00 이상이면 1시간 자동 차감</b>(요일 구분 없이 동일 적용) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · <b>퇴근이 22:00을 넘으면 연장신청 체크박스가 나타나며</b>, 체크하지 않으면 22:00까지만 근무로 인정되고 체크하면 실제 퇴근 시각까지 전부 인정됨 · <b>연차/반차/반반차는 계획근무에서 각각 8:00/4:00/2:00을 차감</b>하고 그만큼만 근무하면 근무 현황에 영향이 없으며, 남은 시간을 채우지 못하거나 더 일하면 그 차이가 근무 현황에 그대로 반영됨 · <b>공휴일은 주말처럼 계획근무가 0으로 처리</b>되어 그냥 쉬면 근무 현황에 영향 없고, 그날 실제로 근무하면 휴일근로로 집계되어 대체휴일에 반영됨 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로-계획근무)의 월 누적값 · 출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다
             </div>
           </div>
           <div class="table-wrap">
@@ -882,6 +992,57 @@
         render();
       });
     });
+
+    const pasteParseBtn = document.getElementById('pasteParseBtn');
+    if(pasteParseBtn){
+      pasteParseBtn.addEventListener('click', ()=>{
+        const textEl = document.getElementById('pasteText');
+        const parsed = parsePasteText(textEl.value);
+        state.pastePending = parsed;
+        render();
+      });
+    }
+    const pasteClearBtn = document.getElementById('pasteClearBtn');
+    if(pasteClearBtn){
+      pasteClearBtn.addEventListener('click', ()=>{
+        const textEl = document.getElementById('pasteText');
+        if(textEl) textEl.value = '';
+        state.pastePending = [];
+        render();
+      });
+    }
+    document.querySelectorAll('.paste-include').forEach(el=>{
+      el.addEventListener('change', e=>{
+        state.pastePending[+e.target.dataset.idx].include = e.target.checked;
+        render();
+      });
+    });
+    document.querySelectorAll('.paste-leave').forEach(el=>{
+      el.addEventListener('change', e=>{
+        state.pastePending[+e.target.dataset.idx].leave = e.target.value;
+      });
+    });
+    document.querySelectorAll('.paste-time').forEach(el=>{
+      el.addEventListener('input', e=>{
+        let v = e.target.value.replace(/[^0-9]/g,'');
+        if(v.length>4) v = v.slice(0,4);
+        if(v.length>=3) v = v.slice(0,2)+':'+v.slice(2);
+        e.target.value = v;
+        state.pastePending[+e.target.dataset.idx][e.target.dataset.f] = v;
+      });
+    });
+    const pasteApplyBtn = document.getElementById('pasteApplyBtn');
+    if(pasteApplyBtn){
+      pasteApplyBtn.addEventListener('click', async ()=>{
+        pasteApplyBtn.disabled = true;
+        const toApply = state.pastePending.filter(r=>r.include);
+        for(const row of toApply){ await applyPasteRow(row); }
+        state.pastePending = state.pastePending.filter(r=>!r.include);
+        const textEl = document.getElementById('pasteText');
+        if(textEl && state.pastePending.length===0) textEl.value = '';
+        render();
+      });
+    }
   }
 
   // ---------------- 렌더링: To do list 탭 (과제 탭 + 캘린더) ----------------
@@ -1351,7 +1512,42 @@
     else attachTodoHandlers();
   }
 
+  function captureFocusState(){
+    const active = document.activeElement;
+    if(!active) return null;
+    const tag = active.tagName;
+    if(tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') return null;
+    const dstr = active.getAttribute('data-date');
+    const field = active.getAttribute('data-field');
+    const id = active.id;
+    if(!dstr && !id) return null; // 로그인 화면 등 식별 불가능한 요소는 건드리지 않음
+    let selStart = null, selEnd = null;
+    if(tag === 'INPUT' && (active.type === 'text' || active.type === 'search')){
+      try{ selStart = active.selectionStart; selEnd = active.selectionEnd; }catch(e){}
+    }
+    return { dstr, field, id, tag, value: active.value, selStart, selEnd };
+  }
+
+  function restoreFocusState(info){
+    if(!info) return;
+    let el = null;
+    if(info.dstr && info.field){
+      el = document.querySelector(`[data-date="${info.dstr}"][data-field="${info.field}"]`);
+    } else if(info.id){
+      el = document.getElementById(info.id);
+    }
+    if(!el) return;
+    if((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && info.value !== undefined && info.value !== el.value){
+      el.value = info.value; // 재렌더링 사이 입력 중이던 값 복원
+    }
+    el.focus();
+    if(info.selStart!=null && el.setSelectionRange){
+      try{ el.setSelectionRange(info.selStart, info.selEnd); }catch(e){}
+    }
+  }
+
   function render(){
+    const focusInfo = state.user ? captureFocusState() : null;
     if(!state.user){
       if(state.authView === 'signup') renderSignup();
       else if(state.authView === 'changepin') renderChangePin();
@@ -1359,6 +1555,7 @@
       return;
     }
     renderApp();
+    restoreFocusState(focusInfo);
   }
 
   (async function init(){
