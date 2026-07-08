@@ -111,6 +111,11 @@
   .balance-label{margin-top:6px;font-size:12px;color:#5a6469;display:flex;justify-content:space-between;}
 
   .legend{font-size:11px;color:#8b9298;margin-top:10px;line-height:1.6;}
+  .paste-guide{font-size:11.5px;color:#6b7680;margin-bottom:8px;line-height:1.5;}
+  .paste-guide a{color:var(--accent);font-weight:700;text-decoration:none;}
+  .paste-guide a:hover{text-decoration:underline;}
+  .legend-line{margin-bottom:6px;}
+  .legend-line:last-child{margin-bottom:0;}
   .paste-textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;font-family:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;resize:vertical;}
   .paste-textarea:focus{outline:2px solid var(--accent);outline-offset:1px;}
   .paste-preview{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:10px;}
@@ -247,6 +252,17 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
+  const RULE_LINES = [
+    '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
+    `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
+    '자정 넘겨 퇴근 시 24:00을 더해 계산 (예: 03:00 입력 시 다음날 새벽 3시로 인식)',
+    '퇴근이 22:00을 넘으면 연장신청 체크박스가 나타나며, 체크하지 않으면 22:00까지만 근무로 인정되고 체크하면 실제 퇴근 시각까지 전부 인정됨',
+    '연차/반차/반반차는 계획근무에서 각각 8:00/4:00/2:00을 차감하고 그만큼만 근무하면 근무 현황에 영향이 없으며, 남은 시간을 채우지 못하거나 더 일하면 그 차이가 근무 현황에 그대로 반영됨',
+    '공휴일은 주말처럼 계획근무가 0으로 처리되어 그냥 쉬면 근무 현황에 영향 없고, 그날 실제로 근무하면 휴일근로로 집계되어 대체휴일에 반영됨',
+    '매월 4번째 금요일은 자동으로 패밀리데이(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용',
+    '근무 현황은 (실제근로-계획근무)의 월 누적값',
+    '출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다'
+  ];
   const SESSION_KEY = 'att_session_v1';
   const STATUS_ORDER = ['pending','in_progress','done'];
   const STATUS_ICON = { pending:'', in_progress:'●', done:'✓' };
@@ -462,9 +478,18 @@
       overtimeEligible = outAdj > CAP;
       if(overtimeEligible && !data.overtime){ outAdj = CAP; } // 연장신청 없으면 22:00까지만 인정
       dur = Math.max(0, outAdj - inM);
-      if(dur >= 9*60) lunch = 60;
-      else if(dur >= 4*60+30) lunch = 30;
-      else lunch = 0;
+      const isWeekdayForLunch = (dow>=1 && dow<=5) && !isPublicHoliday;
+      if(isWeekdayForLunch){
+        // 평일: 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감 (체류시간과 무관)
+        const overlapStart = Math.max(inM, 11*60+30);
+        const overlapEnd = Math.min(outAdj, 12*60+30);
+        lunch = Math.max(0, overlapEnd - overlapStart);
+      } else {
+        // 주말/공휴일: 체류시간 기준 (4:30↑ 30분, 9:00↑ 1시간)
+        if(dur >= 9*60) lunch = 60;
+        else if(dur >= 4*60+30) lunch = 30;
+        else lunch = 0;
+      }
       dinner = dur >= (11*60+30) ? 30 : 0;
       const base = dur - lunch - dinner;
       if(familyDay){
@@ -891,18 +916,13 @@
         <div>
           <div class="card" style="margin-bottom:12px;">
             <h2>출퇴근 기록 붙여넣기</h2>
+            <div class="paste-guide">사내 근태 시스템에서 가져오는 방법: <a href="https://hr.pljec.cloud/" target="_blank" rel="noopener">hr.pljec.cloud</a> 접속 → HSS → 근태수정 신청 → 내용 복사 → 아래에 붙여넣기</div>
             <textarea id="pasteText" class="paste-textarea" rows="6" placeholder="복사한 출퇴근 기록을 여기에 붙여넣으세요"></textarea>
             <div style="display:flex;gap:8px;margin-top:8px;">
               <button class="btn-primary" id="pasteParseBtn">인식하기</button>
               <button class="btn-secondary" id="pasteClearBtn">지우기</button>
             </div>
             <div id="pastePreviewWrap">${renderPastePreview()}</div>
-          </div>
-          <div class="card" style="margin-bottom:12px;">
-            <h2>규칙</h2>
-            <div class="legend">
-              <b>규칙</b> · <b>점심휴게: 체류시간 4:30 이상이면 30분, 9:00 이상이면 1시간 자동 차감</b>(요일 구분 없이 동일 적용) · 저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감(저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급) · 자정 넘겨 퇴근 시 24:00을 더해 계산 · <b>퇴근이 22:00을 넘으면 연장신청 체크박스가 나타나며</b>, 체크하지 않으면 22:00까지만 근무로 인정되고 체크하면 실제 퇴근 시각까지 전부 인정됨 · <b>연차/반차/반반차는 계획근무에서 각각 8:00/4:00/2:00을 차감</b>하고 그만큼만 근무하면 근무 현황에 영향이 없으며, 남은 시간을 채우지 못하거나 더 일하면 그 차이가 근무 현황에 그대로 반영됨 · <b>공휴일은 주말처럼 계획근무가 0으로 처리</b>되어 그냥 쉬면 근무 현황에 영향 없고, 그날 실제로 근무하면 휴일근로로 집계되어 대체휴일에 반영됨 · <b>매월 4번째 금요일은 자동으로 패밀리데이</b>(하늘색 실제근로 칸)로 지정되어, (체류시간-점심휴게-저녁휴게)가 4:00 이하면 +4:00, 4:00~8:00이면 8:00으로 고정, 8:00 초과면 그대로 적용 · 근무 현황은 (실제근로-계획근무)의 월 누적값 · 출근만 입력되고 퇴근이 비어있으면 하늘색으로 지금 시각이 임시로 표시되며(저장은 안 됨), 직접 입력하면 확정 저장됩니다
-            </div>
           </div>
           <div class="table-wrap">
             <table>
@@ -946,6 +966,13 @@
             </div>
             <div class="balance-label"><span>부족</span><span>초과</span></div>
           </div>
+        </div>
+      </div>
+      <div class="top-grid" style="margin-top:16px;">
+        <div></div>
+        <div class="card">
+          <h2>규칙</h2>
+          <div class="legend">${RULE_LINES.map(l=>`<div class="legend-line">· ${l}</div>`).join('')}</div>
         </div>
       </div>
     `;
