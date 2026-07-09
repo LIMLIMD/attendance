@@ -217,10 +217,13 @@
   .mini-cal .day:hover{background:var(--accent-soft);}
   .mini-cal .day.selected{background:var(--accent);color:#fff;font-weight:700;}
   .mini-cal .day.today{box-shadow:inset 0 0 0 1.5px var(--accent);}
-  .mini-cal .day.has-event::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--sun);}
-  .mini-cal .day.selected.has-event::after{background:#fff;}
+  .mini-cal .day .dot-wrap{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);display:flex;gap:2px;}
+  .mini-cal .day.selected .event-dot{background:#fff !important;}
   .mini-cal .day.empty{visibility:hidden;cursor:default;}
-  .mcal-bar{height:4px;border-radius:2px;align-self:end;margin-bottom:2px;pointer-events:auto;cursor:pointer;}
+  .mcal-wrap{position:relative;}
+  .mcal-bars-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;}
+  .mcal-bar{position:absolute;height:4px;border-radius:2px;pointer-events:auto;cursor:pointer;}
+  .event-dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin:0 1px;}
 
   .cal-add-form{display:flex;flex-direction:column;gap:8px;margin:14px 0;padding-top:14px;border-top:1px solid #F0F2F1;}
   .cal-add-form input[type=text], .cal-add-form input[type=datetime-local], .cal-add-form input[type=date]{
@@ -236,6 +239,8 @@
   .cal-allday-chip{display:inline-block;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;border-radius:6px;padding:5px 10px;margin:0 6px 6px 0;}
 
   .cal-timeline{position:relative;height:1200px;overflow-y:auto;max-height:460px;border:1px solid var(--line);border-radius:8px;background:#fff;}
+  .cal-timeline-resizer{height:12px;cursor:row-resize;display:flex;align-items:center;justify-content:center;color:#c7cdcb;font-size:12px;letter-spacing:2px;user-select:none;}
+  .cal-timeline-resizer:hover, .cal-timeline-resizer.dragging{color:var(--accent);}
   .cal-hour-row{position:absolute;left:0;right:0;height:50px;border-top:1px solid #F0F2F1;}
   .cal-hour-label{position:absolute;left:5px;top:-7px;font-size:10px;color:#b7bec2;background:#fff;padding:0 2px;}
   .cal-event-bar{position:absolute;left:50px;right:8px;background:var(--accent);color:#fff;border-radius:7px;padding:4px 8px;font-size:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.15);cursor:pointer;}
@@ -293,7 +298,9 @@
     calendarYear: 2026, calendarMonth: 7, calendarSelectedDate: '', calendarEvents: [], calendarEventEditing: null,
     todoPanelWidth: 340,
     pastePending: [],
-    calendarCategoryFilter: null // null = 전체, 아니면 category id
+    calendarCategoryFilter: null, // null = 전체, 아니면 category id
+    calendarTimelineHeight: 460,
+    multiDayEventsForRender: []
   };
 
   const todayObj = new Date();
@@ -385,6 +392,62 @@
       resizerDragging = true;
       resizerStartX = e.touches[0].clientX;
       resizerStartWidth = left.getBoundingClientRect().width;
+      handle.classList.add('dragging');
+    }, { passive:true });
+  }
+
+  // ---- 캘린더 타임라인 높이 조절 ----
+  const TIMELINE_HEIGHT_KEY = 'cal_timeline_height';
+  function loadTimelineHeight(){
+    try{
+      const v = localStorage.getItem(TIMELINE_HEIGHT_KEY);
+      if(v) state.calendarTimelineHeight = Math.max(200, Math.min(Number(v), 1200));
+    }catch(e){ /* ignore */ }
+  }
+  function saveTimelineHeight(){
+    try{ localStorage.setItem(TIMELINE_HEIGHT_KEY, String(Math.round(state.calendarTimelineHeight))); }catch(e){ /* ignore */ }
+  }
+  let tlDragging = false, tlStartY = 0, tlStartHeight = 0, tlWindowListenersAdded = false;
+  function ensureTimelineWindowListeners(){
+    if(tlWindowListenersAdded) return;
+    tlWindowListenersAdded = true;
+    function move(clientY){
+      if(!tlDragging) return;
+      const el = document.getElementById('calTimeline');
+      if(!el) return;
+      let newH = tlStartHeight + (clientY - tlStartY);
+      newH = Math.max(200, Math.min(newH, 1200));
+      el.style.maxHeight = newH + 'px';
+      state.calendarTimelineHeight = newH;
+    }
+    function end(){
+      if(!tlDragging) return;
+      tlDragging = false;
+      const handle = document.getElementById('calTimelineResizer');
+      if(handle) handle.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      saveTimelineHeight();
+    }
+    window.addEventListener('mousemove', e=>move(e.clientY));
+    window.addEventListener('mouseup', end);
+    window.addEventListener('touchmove', e=>{ if(tlDragging && e.touches[0]) move(e.touches[0].clientY); }, { passive:true });
+    window.addEventListener('touchend', end);
+  }
+  function attachTimelineResizer(){
+    ensureTimelineWindowListeners();
+    const handle = document.getElementById('calTimelineResizer');
+    if(!handle) return;
+    handle.addEventListener('mousedown', e=>{
+      tlDragging = true; tlStartY = e.clientY;
+      tlStartHeight = document.getElementById('calTimeline').getBoundingClientRect().height;
+      handle.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+    handle.addEventListener('touchstart', e=>{
+      if(!e.touches[0]) return;
+      tlDragging = true; tlStartY = e.touches[0].clientY;
+      tlStartHeight = document.getElementById('calTimeline').getBoundingClientRect().height;
       handle.classList.add('dragging');
     }, { passive:true });
   }
@@ -1289,43 +1352,75 @@
     `;
   }
 
-  function computeMultiDayBars(events, year, month, firstDow, nDays){
+  function getMultiDayEvents(events, year, month, nDays){
     const monthStart = new Date(year, month-1, 1);
     const monthEnd = new Date(year, month-1, nDays, 23, 59, 59);
-    const multiDay = events.filter(e => isoToLocalDateKey(e.start_at) !== isoToLocalDateKey(e.end_at));
+    return events
+      .filter(e => isoToLocalDateKey(e.start_at) !== isoToLocalDateKey(e.end_at))
+      .map(e=>{
+        const s = new Date(e.start_at), en = new Date(e.end_at);
+        const clipStart = s < monthStart ? monthStart : s;
+        const clipEnd = en > monthEnd ? monthEnd : en;
+        return { id: e.id, title: e.title, startDay: clipStart.getDate(), endDay: clipEnd.getDate(),
+          color: e.category_id ? categoryColor(e.category_id) : 'var(--accent)' };
+      })
+      .filter(e => e.startDay <= e.endDay);
+  }
 
-    const segments = [];
-    for(const e of multiDay){
-      const s = new Date(e.start_at), en = new Date(e.end_at);
-      const clipStart = s < monthStart ? monthStart : s;
-      const clipEnd = en > monthEnd ? monthEnd : en;
-      if(clipStart > clipEnd) continue;
-      let d = clipStart.getDate();
-      const endDay = clipEnd.getDate();
-      while(d <= endDay){
-        const itemIndex = firstDow + (d - 1);
-        const row = Math.floor(itemIndex / 7) + 2; // +2: 1행은 요일 라벨
-        const colStart = (itemIndex % 7) + 1;
-        const remainInRow = 7 - (colStart - 1);
-        const segEndDay = Math.min(endDay, d + remainInRow - 1);
-        segments.push({
-          row, colStart, colEnd: colStart + (segEndDay - d) + 1,
-          color: e.category_id ? categoryColor(e.category_id) : 'var(--accent)',
-          title: e.title, id: e.id
+  // 실제로 렌더링된 날짜 칸의 위치를 측정해서 그 위에 정확히 겹치도록 바를 그린다
+  // (grid-row/column을 직접 계산하는 방식은 헤더 행 등과 어긋나는 문제가 있어 DOM 측정 방식으로 변경)
+  function positionMultiDayBars(){
+    const overlay = document.getElementById('mcalBarsOverlay');
+    const wrap = document.getElementById('mcalWrap');
+    if(!overlay || !wrap || !state.multiDayEventsForRender) { if(overlay) overlay.innerHTML=''; return; }
+    const wrapRect = wrap.getBoundingClientRect();
+    const barH = 4, barGap = 2;
+    const laneByRow = {}; // key: rowTop(px, rounded) -> used lane count tracking via segments list
+    const allSegments = [];
+
+    state.multiDayEventsForRender.forEach(ev=>{
+      let d = ev.startDay;
+      while(d <= ev.endDay){
+        const startEl = document.querySelector(`.mini-cal .day[data-day="${d}"]`);
+        if(!startEl){ d++; continue; }
+        const rowTop = startEl.offsetTop;
+        // 같은 행(주)에 있는 마지막 날짜까지 세그먼트 확장
+        let segEndDay = d;
+        while(segEndDay + 1 <= ev.endDay){
+          const nextEl = document.querySelector(`.mini-cal .day[data-day="${segEndDay+1}"]`);
+          if(!nextEl || nextEl.offsetTop !== rowTop) break;
+          segEndDay++;
+        }
+        const endEl = document.querySelector(`.mini-cal .day[data-day="${segEndDay}"]`) || startEl;
+        allSegments.push({
+          left: startEl.offsetLeft, width: (endEl.offsetLeft + endEl.offsetWidth) - startEl.offsetLeft,
+          top: startEl.offsetTop + startEl.offsetHeight,
+          color: ev.color, title: ev.title, id: ev.id, rowKey: rowTop
         });
         d = segEndDay + 1;
       }
-    }
-    // 같은 주(행)에서 겹치는 일정은 위아래로 겹치지 않게 레인 배정
-    const laneByRow = {};
-    segments.forEach(seg=>{
-      if(!laneByRow[seg.row]) laneByRow[seg.row] = [];
-      let lane = 0;
-      while(laneByRow[seg.row].some(o=> o.lane===lane && !(seg.colEnd<=o.colStart || seg.colStart>=o.colEnd))) lane++;
-      seg.lane = lane;
-      laneByRow[seg.row].push(seg);
     });
-    return segments;
+
+    // 같은 행에서 겹치는 세그먼트는 레인을 나눠 위아래로 쌓음
+    const rowLanes = {};
+    allSegments.forEach(seg=>{
+      if(!rowLanes[seg.rowKey]) rowLanes[seg.rowKey] = [];
+      let lane = 0;
+      while(rowLanes[seg.rowKey].some(o=> o.lane===lane && !(seg.left+seg.width<=o.left || seg.left>=o.left+o.width))) lane++;
+      seg.lane = lane;
+      rowLanes[seg.rowKey].push(seg);
+    });
+
+    overlay.innerHTML = allSegments.map(seg=>`
+      <div class="mcal-bar" style="left:${seg.left}px;width:${seg.width}px;top:${seg.top + seg.lane*(barH+barGap)}px;background:${seg.color};" data-event="${seg.id}" title="${escapeHtml(seg.title)}"></div>
+    `).join('');
+
+    document.querySelectorAll('.mcal-bar').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const id = el.getAttribute('data-event');
+        if(id) deleteCalendarEvent(id);
+      });
+    });
   }
 
   function renderCalendarPanel(){
@@ -1337,8 +1432,18 @@
     const filterCatId = state.calendarCategoryFilter;
     const visibleEvents = filterCatId ? state.calendarEvents.filter(e=>e.category_id===filterCatId) : state.calendarEvents;
 
-    const eventDates = new Set(visibleEvents.map(e=> isoToLocalDateKey(e.start_at) ));
-    const multiDayBars = computeMultiDayBars(visibleEvents, y, m, firstDow, nDays);
+    const multiDayEvents = getMultiDayEvents(visibleEvents, y, m, nDays);
+    const multiDayIds = new Set(multiDayEvents.map(e=>e.id));
+    state.multiDayEventsForRender = multiDayEvents;
+
+    // 하루짜리 일정만 날짜 칸에 작은 점으로 표시 (여러 날 일정은 아래 바로 별도 표시)
+    const singleDayColorsByDate = {};
+    visibleEvents.filter(e=>!multiDayIds.has(e.id)).forEach(e=>{
+      const dk = isoToLocalDateKey(e.start_at);
+      if(!singleDayColorsByDate[dk]) singleDayColorsByDate[dk] = [];
+      const color = e.category_id ? categoryColor(e.category_id) : 'var(--sun)';
+      if(!singleDayColorsByDate[dk].includes(color)) singleDayColorsByDate[dk].push(color);
+    });
 
     let cells = '';
     for(let i=0;i<firstDow;i++) cells += `<div class="day empty"></div>`;
@@ -1347,12 +1452,10 @@
       const cls = ['day'];
       if(dstr === state.calendarSelectedDate) cls.push('selected');
       if(dstr === todayStr) cls.push('today');
-      if(eventDates.has(dstr)) cls.push('has-event');
-      cells += `<div class="${cls.join(' ')}" data-date="${dstr}">${d}</div>`;
+      const dots = (singleDayColorsByDate[dstr]||[]).slice(0,3);
+      const dotsHtml = dots.length ? `<span class="dot-wrap">${dots.map(c=>`<span class="event-dot" style="background:${c};"></span>`).join('')}</span>` : '';
+      cells += `<div class="${cls.join(' ')}" data-date="${dstr}" data-day="${d}">${d}${dotsHtml}</div>`;
     }
-    const barsHtml = multiDayBars.map(seg=>`
-      <div class="mcal-bar" style="grid-row:${seg.row};grid-column:${seg.colStart}/${seg.colEnd};background:${seg.color};margin-bottom:${seg.lane*6}px;" data-event="${seg.id}" title="${escapeHtml(seg.title)}"></div>
-    `).join('');
 
     const filterTabsHtml = `
       <button class="cal-filter-btn ${!filterCatId ? 'active' : ''}" data-filter="">전체</button>
@@ -1415,10 +1518,12 @@
           <button id="cal-next-month">›</button>
         </div>
         ${state.todoCategories.length > 0 ? `<div class="cal-filter-nav">${filterTabsHtml}</div>` : ''}
-        <div class="mini-cal">
-          ${DOW_LABEL.map(d=>`<div class="dow">${d}</div>`).join('')}
-          ${cells}
-          ${barsHtml}
+        <div class="mcal-wrap" id="mcalWrap">
+          <div class="mini-cal">
+            ${DOW_LABEL.map(d=>`<div class="dow">${d}</div>`).join('')}
+            ${cells}
+          </div>
+          <div class="mcal-bars-overlay" id="mcalBarsOverlay"></div>
         </div>
 
         <div class="cal-add-form">
@@ -1433,10 +1538,11 @@
 
         <div class="cal-selected-label">${selDate} 일정</div>
         ${allDayHtml}
-        <div class="cal-timeline" id="calTimeline">
+        <div class="cal-timeline" id="calTimeline" style="max-height:${state.calendarTimelineHeight}px;">
           ${hourRows.join('')}
           ${eventBars}
         </div>
+        <div class="cal-timeline-resizer" id="calTimelineResizer" title="드래그해서 높이 조절">⋯</div>
         <div class="cal-event-list">${listHtml}</div>
       </div>
     `;
@@ -1454,6 +1560,8 @@
 
   function attachTodoHandlers(){
     attachResizerHandlers();
+    attachTimelineResizer();
+    positionMultiDayBars();
     const newCatInput = document.getElementById('newCategoryInput');
     const addCatBtn = document.getElementById('addCategoryBtn');
     async function doAddCategory(){
@@ -1642,7 +1750,7 @@
       });
     }
 
-    document.querySelectorAll('.cal-event-bar, .cal-allday-chip, .mcal-bar').forEach(el=>{
+    document.querySelectorAll('.cal-event-bar, .cal-allday-chip').forEach(el=>{
       el.addEventListener('click', ()=>{
         const id = el.getAttribute('data-event');
         if(id) deleteCalendarEvent(id);
@@ -1798,6 +1906,7 @@
 
   (async function init(){
     loadTodoPanelWidth();
+    loadTimelineHeight();
     const session = loadSession();
     if(session && session.id){
       state.user = session;
