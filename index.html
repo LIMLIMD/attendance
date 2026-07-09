@@ -221,6 +221,12 @@
   .note-card.expanded .note-header{border-bottom:1px solid var(--line);}
   .note-textarea{width:100%;min-height:220px;border:none;padding:14px 16px;font-size:13.5px;font-family:inherit;resize:vertical;color:var(--ink);}
   .note-textarea:focus{outline:none;background:#FAFBFA;}
+  .note-flag{border:none;background:none;font-size:15px;cursor:pointer;padding:0;line-height:1;opacity:.28;filter:grayscale(1);flex-shrink:0;}
+  .note-flag.pinned{opacity:1;filter:none;}
+  .note-delete-btn{border:none;background:#FFE1E1;color:var(--minus);font-size:11px;font-weight:700;border-radius:6px;padding:6px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+  .note-delete-btn:hover{background:#FFC9C9;}
+  .note-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-top:1px solid var(--line);}
+  .note-hint{font-size:11px;color:#9aa3ac;line-height:1.5;}
 
   .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:24px;grid-auto-rows:62px;row-gap:16px;column-gap:3px;font-size:12.5px;text-align:center;}
   .mini-cal-resizer{height:12px;cursor:row-resize;display:flex;align-items:center;justify-content:center;color:#c7cdcb;font-size:12px;letter-spacing:2px;user-select:none;margin-top:2px;}
@@ -280,7 +286,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v1.0.1.0';
+  const APP_VERSION = 'v1.0.1.1';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -811,20 +817,32 @@
 
   // ---------------- 메모장 데이터 ----------------
 
+  const NOTE_AUTO_DELETE_DAYS = 15;
+
   async function loadNotepads(){
     state.notepads = [];
     if(!supabase || !state.user) return;
-    const { data } = await supabase.from('notepads').select('id,name,content,sort_order')
+    const { data } = await supabase.from('notepads').select('id,name,content,sort_order,pinned,created_at')
       .eq('user_id', state.user.id).order('sort_order', { ascending:true });
-    state.notepads = data || [];
+    const all = data || [];
+
+    // 고정(핀)하지 않은 메모장 중 15일이 지난 것은 자동으로 삭제
+    const cutoff = Date.now() - NOTE_AUTO_DELETE_DAYS * 24 * 60 * 60 * 1000;
+    const expired = all.filter(n => !n.pinned && new Date(n.created_at).getTime() < cutoff);
+    const kept = all.filter(n => n.pinned || new Date(n.created_at).getTime() >= cutoff);
+
+    if(expired.length > 0){
+      await supabase.from('notepads').delete().in('id', expired.map(n=>n.id));
+    }
+    state.notepads = kept;
   }
 
   async function addNotepad(name){
     if(!supabase || !state.user || !name) return;
     const maxOrder = state.notepads.reduce((mx,n)=>Math.max(mx, n.sort_order||0), 0);
     const { data, error } = await supabase.from('notepads')
-      .insert({ user_id: state.user.id, name, content: '', sort_order: maxOrder+1 })
-      .select('id,name,content,sort_order').single();
+      .insert({ user_id: state.user.id, name, content: '', sort_order: maxOrder+1, pinned: false })
+      .select('id,name,content,sort_order,pinned,created_at').single();
     if(!error && data){ state.notepads.push(data); state.notepadExpandedId = data.id; flashSave(); }
   }
 
@@ -835,6 +853,12 @@
     Object.assign(n, fields);
     const { error } = await supabase.from('notepads').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id);
     if(!error) flashSave();
+  }
+
+  async function toggleNotepadPinned(id){
+    const n = state.notepads.find(n=>n.id===id);
+    if(!n) return;
+    await updateNotepad(id, { pinned: !n.pinned });
   }
 
   async function deleteNotepad(id){
@@ -923,15 +947,30 @@
     const nameEl = document.getElementById('loginName');
     const pinEl = document.getElementById('loginPin');
     const btn = document.getElementById('loginBtn');
-    pinEl.addEventListener('input', ()=>{ pinEl.value = pinEl.value.replace(/[^0-9]/g,'').slice(0,4); });
+    const errEl = document.getElementById('loginError');
+    let loginInFlight = false;
+    pinEl.addEventListener('input', ()=>{
+      pinEl.value = pinEl.value.replace(/[^0-9]/g,'').slice(0,4);
+      if(pinEl.value.length === 4) doLogin();
+    });
     async function doLogin(){
+      if(loginInFlight) return;
+      loginInFlight = true;
       btn.disabled = true; btn.textContent = '로그인 중...';
       const res = await login(nameEl.value.trim(), pinEl.value.trim());
       if(res.ok){
         state.user = res.user; state.loginError=''; saveSession(res.user);
         await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
         render();
-      } else { state.loginError = res.message; btn.disabled=false; btn.textContent='로그인'; render(); }
+      } else {
+        // 화면 전체를 다시 그리지 않고 PIN만 지워서 이름은 그대로 유지
+        state.loginError = res.message;
+        if(errEl) errEl.textContent = res.message;
+        pinEl.value = '';
+        pinEl.focus();
+        btn.disabled = false; btn.textContent = '로그인';
+        loginInFlight = false;
+      }
     }
     btn.addEventListener('click', doLogin);
     [nameEl, pinEl].forEach(el=>{ el.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }); });
@@ -1586,12 +1625,17 @@
       return `
         <div class="note-card ${expanded ? 'expanded' : ''}" data-note="${n.id}">
           <div class="note-header" data-note-toggle="${n.id}">
+            <button class="note-flag ${n.pinned ? 'pinned' : ''}" data-note-flag="${n.id}" title="${n.pinned ? '15일 자동삭제 대상에서 제외됨 (눌러서 해제)' : '눌러서 15일 자동삭제에서 제외'}">🚩</button>
             <span class="note-name">${escapeHtml(n.name)}</span>
             ${!expanded ? `<span class="note-preview">${escapeHtml(preview)}${(n.content||'').length>60 ? '…' : ''}</span>` : ''}
-            <button class="todo-icon-btn danger" data-note-delete="${n.id}" title="삭제">×</button>
+            <button class="note-delete-btn" data-note-delete="${n.id}" title="삭제">삭제</button>
           </div>
           ${expanded ? `
             <textarea class="note-textarea" data-note-content="${n.id}" placeholder="내용을 입력하세요">${escapeHtml(n.content||'')}</textarea>
+            <div class="note-footer">
+              <span class="note-hint">${n.pinned ? '🚩 고정됨 — 자동삭제 대상 아님' : `작성 후 ${NOTE_AUTO_DELETE_DAYS}일이 지나면 자동으로 삭제돼요. 깃발을 눌러 고정할 수 있어요.`}</span>
+              <button class="note-delete-btn" data-note-delete="${n.id}">이 메모장 삭제</button>
+            </div>
           ` : ''}
         </div>
       `;
@@ -1603,6 +1647,7 @@
           <input type="text" id="newNoteInput" placeholder="새 메모장 이름" maxlength="40">
           <button id="addNoteBtn" class="btn-primary">메모장 추가</button>
         </div>
+        <div class="ocr-hint" style="margin-top:8px;">메모장은 만든 지 ${NOTE_AUTO_DELETE_DAYS}일이 지나면 자동으로 삭제돼요. 계속 남겨두고 싶으면 이름 옆 🚩를 눌러 고정하세요.</div>
       </div>
       <div class="note-list">${listHtml}</div>
     `;
@@ -1624,9 +1669,18 @@
 
     document.querySelectorAll('[data-note-toggle]').forEach(el=>{
       el.addEventListener('click', (e)=>{
-        if(e.target.closest('[data-note-delete]')) return;
+        if(e.target.closest('[data-note-delete]') || e.target.closest('[data-note-flag]')) return;
         const id = el.getAttribute('data-note-toggle');
         state.notepadExpandedId = state.notepadExpandedId === id ? null : id;
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-note-flag]').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        e.stopPropagation();
+        const id = btn.getAttribute('data-note-flag');
+        await toggleNotepadPinned(id);
         render();
       });
     });
