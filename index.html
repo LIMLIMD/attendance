@@ -139,6 +139,7 @@
   .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;}
   .login-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px 28px;width:100%;max-width:340px;}
   .login-card h1{font-size:20px;margin:0 0 4px 0;}
+  .app-version{font-size:11px;color:#b7bec2;font-weight:600;margin-left:6px;vertical-align:middle;}
   .login-card .desc{font-size:12.5px;color:#6b7680;margin-bottom:20px;line-height:1.5;}
   .login-field{margin-bottom:12px;}
   .login-field label{display:block;font-size:12px;font-weight:700;color:#54606a;margin-bottom:5px;}
@@ -211,7 +212,7 @@
   .new-cat-row input{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;}
   .new-cat-row input:focus{outline:2px solid var(--accent);outline-offset:1px;}
 
-  .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;font-size:12.5px;text-align:center;}
+  .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);row-gap:16px;column-gap:3px;font-size:12.5px;text-align:center;}
   .mini-cal .dow{color:#8b9298;font-weight:700;padding:4px 0;}
   .mini-cal .day{padding:9px 0;border-radius:7px;cursor:pointer;position:relative;}
   .mini-cal .day:hover{background:var(--accent-soft);}
@@ -222,7 +223,9 @@
   .mini-cal .day.empty{visibility:hidden;cursor:default;}
   .mcal-wrap{position:relative;}
   .mcal-bars-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;}
-  .mcal-bar{position:absolute;height:4px;border-radius:2px;pointer-events:auto;cursor:pointer;}
+  .mcal-bar{position:absolute;height:16px;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:4px;overflow:hidden;}
+  .mcal-bar .mcal-line{flex:1;height:1px;background:currentColor;min-width:3px;}
+  .mcal-bar .mcal-title{font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
   .event-dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin:0 1px;}
 
   .cal-add-form{display:flex;flex-direction:column;gap:8px;margin:14px 0;padding-top:14px;border-top:1px solid #F0F2F1;}
@@ -273,6 +276,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
+  const APP_VERSION = 'v1.0.0.1';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -862,7 +866,7 @@
     document.getElementById('app').innerHTML = `
       <div class="login-wrap">
         <div class="login-card">
-          <h1>Aiden</h1>
+          <h1>Aiden<span class="app-version">${APP_VERSION}</span></h1>
           <div class="desc">이름과 4자리 PIN으로 로그인하세요.</div>
           <div class="login-field"><label>이름</label><input id="loginName" type="text" placeholder="홍길동" maxlength="20"></div>
           <div class="login-field"><label>PIN (숫자 4자리)</label><input id="loginPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••"></div>
@@ -1374,7 +1378,7 @@
     const wrap = document.getElementById('mcalWrap');
     if(!overlay || !wrap || !state.multiDayEventsForRender) { if(overlay) overlay.innerHTML=''; return; }
     const wrapRect = wrap.getBoundingClientRect();
-    const barH = 4, barGap = 2;
+    const barH = 16, barGap = 2;
     const laneByRow = {}; // key: rowTop(px, rounded) -> used lane count tracking via segments list
     const allSegments = [];
 
@@ -1412,7 +1416,9 @@
     });
 
     overlay.innerHTML = allSegments.map(seg=>`
-      <div class="mcal-bar" style="left:${seg.left}px;width:${seg.width}px;top:${seg.top + seg.lane*(barH+barGap)}px;background:${seg.color};" data-event="${seg.id}" title="${escapeHtml(seg.title)}"></div>
+      <div class="mcal-bar" style="left:${seg.left}px;width:${seg.width}px;top:${seg.top + seg.lane*(barH+barGap)}px;color:${seg.color};" data-event="${seg.id}" title="${escapeHtml(seg.title)}">
+        <span class="mcal-line"></span><span class="mcal-title">${escapeHtml(seg.title)}</span><span class="mcal-line"></span>
+      </div>
     `).join('');
 
     document.querySelectorAll('.mcal-bar').forEach(el=>{
@@ -1826,7 +1832,7 @@
     document.getElementById('app').innerHTML = `
       <div class="header">
         <div>
-          <h1>Aiden</h1>
+          <h1>Aiden<span class="app-version">${APP_VERSION}</span></h1>
           <div class="sub">${state.tab==='attendance' ? '출퇴근 시간을 입력하면 근무 현황이 자동으로 계산돼요' : '과제별로 할 일을 관리하고, 오른쪽 캘린더에 일정을 추가하세요'} · <span id="save-flag" class="save-flag">저장됨</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
