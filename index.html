@@ -212,6 +212,16 @@
   .new-cat-row input{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;}
   .new-cat-row input:focus{outline:2px solid var(--accent);outline-offset:1px;}
 
+  .note-list{display:flex;flex-direction:column;gap:10px;}
+  .note-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:box-shadow .15s;}
+  .note-card.expanded{box-shadow:0 2px 10px rgba(0,0,0,.06);}
+  .note-header{display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;}
+  .note-name{font-weight:700;font-size:14px;color:var(--ink);white-space:nowrap;}
+  .note-preview{flex:1;color:#9aa3ac;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .note-card.expanded .note-header{border-bottom:1px solid var(--line);}
+  .note-textarea{width:100%;min-height:220px;border:none;padding:14px 16px;font-size:13.5px;font-family:inherit;resize:vertical;color:var(--ink);}
+  .note-textarea:focus{outline:none;background:#FAFBFA;}
+
   .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:24px;grid-auto-rows:62px;row-gap:16px;column-gap:3px;font-size:12.5px;text-align:center;}
   .mini-cal-resizer{height:12px;cursor:row-resize;display:flex;align-items:center;justify-content:center;color:#c7cdcb;font-size:12px;letter-spacing:2px;user-select:none;margin-top:2px;}
   .mini-cal-resizer:hover, .mini-cal-resizer.dragging{color:var(--accent);}
@@ -270,7 +280,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v1.0.0.3';
+  const APP_VERSION = 'v1.0.1.0';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -299,7 +309,8 @@
     pastePending: [],
     calendarCategoryFilter: null, // null = 전체, 아니면 category id
     miniCalRowHeight: 62,
-    multiDayEventsForRender: []
+    multiDayEventsForRender: [],
+    notepads: [], notepadExpandedId: null
   };
 
   const todayObj = new Date();
@@ -798,6 +809,41 @@
     });
   }
 
+  // ---------------- 메모장 데이터 ----------------
+
+  async function loadNotepads(){
+    state.notepads = [];
+    if(!supabase || !state.user) return;
+    const { data } = await supabase.from('notepads').select('id,name,content,sort_order')
+      .eq('user_id', state.user.id).order('sort_order', { ascending:true });
+    state.notepads = data || [];
+  }
+
+  async function addNotepad(name){
+    if(!supabase || !state.user || !name) return;
+    const maxOrder = state.notepads.reduce((mx,n)=>Math.max(mx, n.sort_order||0), 0);
+    const { data, error } = await supabase.from('notepads')
+      .insert({ user_id: state.user.id, name, content: '', sort_order: maxOrder+1 })
+      .select('id,name,content,sort_order').single();
+    if(!error && data){ state.notepads.push(data); state.notepadExpandedId = data.id; flashSave(); }
+  }
+
+  async function updateNotepad(id, fields){
+    if(!supabase || !state.user) return;
+    const n = state.notepads.find(n=>n.id===id);
+    if(!n) return;
+    Object.assign(n, fields);
+    const { error } = await supabase.from('notepads').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id);
+    if(!error) flashSave();
+  }
+
+  async function deleteNotepad(id){
+    state.notepads = state.notepads.filter(n=>n.id!==id);
+    if(state.notepadExpandedId === id) state.notepadExpandedId = null;
+    render();
+    await supabase.from('notepads').delete().eq('id', id);
+  }
+
   // ---------------- 캘린더 데이터 ----------------
 
   async function loadCalendarEvents(){
@@ -883,7 +929,7 @@
       const res = await login(nameEl.value.trim(), pinEl.value.trim());
       if(res.ok){
         state.user = res.user; state.loginError=''; saveSession(res.user);
-        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents()]);
+        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
         render();
       } else { state.loginError = res.message; btn.disabled=false; btn.textContent='로그인'; render(); }
     }
@@ -919,7 +965,7 @@
       const res = await register(nameEl.value.trim(), pinEl.value.trim(), pinConfirmEl.value.trim());
       if(res.ok){
         state.user = res.user; state.signupError=''; saveSession(res.user);
-        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents()]);
+        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
         render();
       } else { state.signupError = res.message; btn.disabled=false; btn.textContent='회원가입'; render(); }
     }
@@ -956,7 +1002,7 @@
       const res = await changePin(nameEl.value.trim(), oldPinEl.value.trim(), newPinEl.value.trim(), newPinConfirmEl.value.trim());
       if(res.ok){
         state.user = res.user; state.changePinError=''; saveSession(res.user);
-        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents()]);
+        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
         render();
       } else { state.changePinError = res.message; btn.disabled=false; btn.textContent='PIN 변경'; render(); }
     }
@@ -1530,6 +1576,78 @@
     `;
   }
 
+  // ---------------- 렌더링: 메모장 탭 ----------------
+
+  function renderNotepadHtml(){
+    const notes = state.notepads.slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+    const listHtml = notes.map(n=>{
+      const expanded = state.notepadExpandedId === n.id;
+      const preview = (n.content||'').slice(0, 60).replace(/\n/g,' ');
+      return `
+        <div class="note-card ${expanded ? 'expanded' : ''}" data-note="${n.id}">
+          <div class="note-header" data-note-toggle="${n.id}">
+            <span class="note-name">${escapeHtml(n.name)}</span>
+            ${!expanded ? `<span class="note-preview">${escapeHtml(preview)}${(n.content||'').length>60 ? '…' : ''}</span>` : ''}
+            <button class="todo-icon-btn danger" data-note-delete="${n.id}" title="삭제">×</button>
+          </div>
+          ${expanded ? `
+            <textarea class="note-textarea" data-note-content="${n.id}" placeholder="내용을 입력하세요">${escapeHtml(n.content||'')}</textarea>
+          ` : ''}
+        </div>
+      `;
+    }).join('') || `<div class="todo-empty">아직 메모장이 없어요. 아래에서 하나 추가해보세요.</div>`;
+
+    return `
+      <div class="card" style="margin-bottom:12px;">
+        <div class="new-cat-row">
+          <input type="text" id="newNoteInput" placeholder="새 메모장 이름" maxlength="40">
+          <button id="addNoteBtn" class="btn-primary">메모장 추가</button>
+        </div>
+      </div>
+      <div class="note-list">${listHtml}</div>
+    `;
+  }
+
+  function attachNotepadHandlers(){
+    const newNoteInput = document.getElementById('newNoteInput');
+    const addNoteBtn = document.getElementById('addNoteBtn');
+    async function doAddNote(){
+      const name = newNoteInput.value.trim();
+      if(!name) return;
+      addNoteBtn.disabled = true;
+      await addNotepad(name);
+      addNoteBtn.disabled = false;
+      render();
+    }
+    if(addNoteBtn) addNoteBtn.addEventListener('click', doAddNote);
+    if(newNoteInput) newNoteInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doAddNote(); });
+
+    document.querySelectorAll('[data-note-toggle]').forEach(el=>{
+      el.addEventListener('click', (e)=>{
+        if(e.target.closest('[data-note-delete]')) return;
+        const id = el.getAttribute('data-note-toggle');
+        state.notepadExpandedId = state.notepadExpandedId === id ? null : id;
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-note-delete]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const id = btn.getAttribute('data-note-delete');
+        const note = state.notepads.find(n=>n.id===id);
+        if(note && confirm(`"${note.name}" 메모장을 삭제할까요?`)){ deleteNotepad(id); }
+      });
+    });
+
+    document.querySelectorAll('[data-note-content]').forEach(el=>{
+      el.addEventListener('change', async ()=>{
+        const id = el.getAttribute('data-note-content');
+        await updateNotepad(id, { content: el.value });
+      });
+    });
+  }
+
   function attachTodoHandlers(){
     attachResizerHandlers();
     attachMiniCalResizer();
@@ -1788,11 +1906,16 @@
 
   function renderApp(){
     startLiveTick();
+    const subLabel = state.tab==='attendance'
+      ? '출퇴근 시간을 입력하면 근무 현황이 자동으로 계산돼요'
+      : state.tab==='todo'
+        ? '과제별로 할 일을 관리하고, 오른쪽 캘린더에 일정을 추가하세요'
+        : '메모장을 추가하고 눌러서 내용을 적어보세요';
     document.getElementById('app').innerHTML = `
       <div class="header">
         <div>
           <h1>Aiden<span class="app-version">${APP_VERSION}</span></h1>
-          <div class="sub">${state.tab==='attendance' ? '출퇴근 시간을 입력하면 근무 현황이 자동으로 계산돼요' : '과제별로 할 일을 관리하고, 오른쪽 캘린더에 일정을 추가하세요'} · <span id="save-flag" class="save-flag">저장됨</span></div>
+          <div class="sub">${subLabel} · <span id="save-flag" class="save-flag">저장됨</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <div class="user-chip">${state.user.name}님 <button id="logoutBtn">로그아웃</button></div>
@@ -1808,19 +1931,22 @@
       <div class="tab-nav">
         <button class="tab-btn ${state.tab==='attendance' ? 'active' : ''}" id="tabAttendance">근태 관리</button>
         <button class="tab-btn ${state.tab==='todo' ? 'active' : ''}" id="tabTodo">To do list</button>
+        <button class="tab-btn ${state.tab==='notes' ? 'active' : ''}" id="tabNotes">메모장</button>
       </div>
 
       <div id="tabContent">
-        ${state.tab==='attendance' ? renderAttendanceHtml() : renderTodoHtml()}
+        ${state.tab==='attendance' ? renderAttendanceHtml() : state.tab==='todo' ? renderTodoHtml() : renderNotepadHtml()}
       </div>
     `;
 
     document.getElementById('logoutBtn').onclick = logout;
     document.getElementById('tabAttendance').onclick = ()=>{ state.tab='attendance'; render(); };
     document.getElementById('tabTodo').onclick = ()=>{ state.tab='todo'; render(); };
+    document.getElementById('tabNotes').onclick = ()=>{ state.tab='notes'; render(); };
 
     if(state.tab==='attendance') attachAttendanceHandlers();
-    else attachTodoHandlers();
+    else if(state.tab==='todo') attachTodoHandlers();
+    else attachNotepadHandlers();
   }
 
   function captureFocusState(){
@@ -1875,7 +2001,7 @@
     const session = loadSession();
     if(session && session.id){
       state.user = session;
-      await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents()]);
+      await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
     }
     render();
   })();
