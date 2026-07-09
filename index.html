@@ -1647,7 +1647,6 @@
           <input type="text" id="newNoteInput" placeholder="새 메모장 이름" maxlength="40">
           <button id="addNoteBtn" class="btn-primary">메모장 추가</button>
         </div>
-        <div class="ocr-hint" style="margin-top:8px;">메모장은 만든 지 ${NOTE_AUTO_DELETE_DAYS}일이 지나면 자동으로 삭제돼요. 계속 남겨두고 싶으면 이름 옆 🚩를 눌러 고정하세요.</div>
       </div>
       <div class="note-list">${listHtml}</div>
     `;
@@ -1964,7 +1963,7 @@
       ? '출퇴근 시간을 입력하면 근무 현황이 자동으로 계산돼요'
       : state.tab==='todo'
         ? '과제별로 할 일을 관리하고, 오른쪽 캘린더에 일정을 추가하세요'
-        : '메모장을 추가하고 눌러서 내용을 적어보세요';
+        : `메모장을 추가하고 눌러서 내용을 적어보세요 · 만든 지 ${NOTE_AUTO_DELETE_DAYS}일이 지나면 자동으로 삭제돼요. 계속 남겨두고 싶으면 이름 옆 🚩를 눌러 고정하세요`;
     document.getElementById('app').innerHTML = `
       <div class="header">
         <div>
