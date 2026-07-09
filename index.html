@@ -112,6 +112,12 @@
   tbody tr.weekend-sun .date-cell{color:var(--sun);font-weight:700;}
   .date-cell{font-weight:600;}
 
+  input[type=text]:not(.time-input), input[type=password], input[type=number], input[type=date],
+  input[type=datetime-local], input[type=search], select:not(.leave-input), textarea{
+    background:var(--panel);color:var(--ink);
+  }
+  html[data-theme="dark"] input[type=date], html[data-theme="dark"] input[type=datetime-local]{color-scheme:dark;}
+
   select.leave-input, input.time-input{
     border:1px solid var(--input-border);background:var(--input-bg);border-radius:6px;padding:4px 5px;font-size:12.5px;width:100%;text-align:center;
   }
@@ -312,8 +318,8 @@
   .mini-cal .day.today .day-num{color:var(--accent);}
   .mini-cal .day.selected .day-num{color:#fff;}
   .day-event-line{display:flex;align-items:baseline;gap:3px;font-size:9.5px;line-height:1.35;white-space:nowrap;overflow:hidden;padding:0 2px;font-weight:600;}
-  .day-event-line .det{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .day-event-line .det-fill{flex:1 1 auto;min-width:3px;border-bottom:1px dashed currentColor;opacity:.4;margin-bottom:2px;}
+  .day-event-line .det-time{flex-shrink:0;opacity:.75;}
+  .day-event-line .det-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .day-event-more{font-size:9px;color:var(--muted3);padding:0 2px;font-weight:700;}
   .mini-cal .day.selected .day-event-line, .mini-cal .day.selected .day-event-more{color:#fff;}
   .mini-cal .day.selected .day-event-line{opacity:.92;}
@@ -344,8 +350,8 @@
     --accent-hover:#26a488;
     --sat:#6FA0E8;
     --sun:#E27C6E;
-    --input-bg:#3A331B;
-    --input-bg-hover:#4a4025;
+    --input-bg:#463b16;
+    --input-bg-hover:#5a4c1c;
     --plus:#2FBE9C;
     --minus:#E27C6E;
     --amber:#F0A83C;
@@ -365,7 +371,7 @@
     --border-light:#2A2F34;
     --danger-bg:#3A2222;
     --danger-bg-hover:#472828;
-    --input-border:#5a5230;
+    --input-border:#a8842f;
     --live-bg:#1E3038;
     --live-bg-hover:#274050;
     --live-color:#8FAAB6;
@@ -400,7 +406,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v1.0.2.0';
+  const APP_VERSION = 'v1.0.2.1';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -1683,7 +1689,7 @@
       const shown = dayEvents.slice(0, MAX_DAY_LINES);
       const extra = dayEvents.length - shown.length;
       const linesHtml = shown.map(ev=>`
-        <div class="day-event-line" style="color:${isSelected ? '#fff' : ev.color};"><span class="det">${escapeHtml(ev.timeLabel)} / ${escapeHtml(ev.title)}</span><span class="det-fill"></span></div>
+        <div class="day-event-line" style="color:${isSelected ? '#fff' : ev.color};"><span class="det-time">[${escapeHtml(ev.timeLabel)}]</span><span class="det-title">${escapeHtml(ev.title)}</span></div>
       `).join('');
       const moreHtml = extra > 0 ? `<div class="day-event-more">외 ${extra}건</div>` : '';
       cells += `<div class="${cls.join(' ')}" data-date="${dstr}" data-day="${d}"><span class="day-num">${d}</span>${linesHtml}${moreHtml}</div>`;
