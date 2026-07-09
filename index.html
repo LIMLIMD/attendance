@@ -241,7 +241,7 @@
 
   .cal-selected-label{font-size:13px;font-weight:700;color:#54606a;margin:14px 0 8px 0;}
   .cal-allday-section{margin-bottom:10px;}
-  .cal-allday-chip{display:inline-block;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;border-radius:6px;padding:5px 10px;margin:0 6px 6px 0;}
+  .cal-allday-chip{display:inline-block;background:var(--accent-soft);color:#fff;font-size:12px;font-weight:700;border-radius:6px;padding:5px 10px;margin:0 6px 6px 0;}
 
   .cal-event-list{margin-top:12px;}
   .cal-event-list-item{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:7px 2px;border-bottom:1px solid #EEF1F0;gap:8px;}
@@ -270,7 +270,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v1.0.0.2';
+  const APP_VERSION = 'v1.0.0.3';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
