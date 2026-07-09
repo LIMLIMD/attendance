@@ -386,6 +386,15 @@
   html[data-theme="dark"] input.time-input.invalid{background:#3A2222;}
   html[data-theme="dark"] .note-card.expanded{box-shadow:0 2px 10px var(--shadow-soft);}
   html[data-theme="dark"] ::placeholder{color:var(--muted5);opacity:1;}
+  html[data-theme="dark"] select.leave-input, html[data-theme="dark"] input.time-input:not(.live-preview){color:#fff;}
+
+  /* ---- 입력창 색상 설정 패널 ---- */
+  .color-settings-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;}
+  .color-settings-panel .cs-title{font-size:12px;font-weight:700;color:var(--text2);width:100%;}
+  .cs-field{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text2);font-weight:600;}
+  .cs-field input[type=color]{width:34px;height:30px;border:1px solid var(--line);border-radius:6px;padding:2px;background:var(--panel);cursor:pointer;}
+  .cs-reset-btn{border:none;background:var(--surface2);color:var(--text2);font-size:11.5px;font-weight:700;border-radius:6px;padding:6px 10px;cursor:pointer;}
+  .cs-reset-btn:hover{background:var(--surface-hover);}
 </style>
 </head>
 <body>
@@ -406,7 +415,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v1.0.2.1';
+  const APP_VERSION = 'v1.0.2.2';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -433,6 +442,7 @@
     todoCategories: [], todoItems: [], todoActiveCatId: null, todoCatEditing: null, todoItemEditing: null,
     calendarYear: 2026, calendarMonth: 7, calendarSelectedDate: '', calendarEvents: [], calendarEventEditing: null,
     calendarAddFormOpen: false,
+    colorSettingsOpen: false,
     todoPanelWidth: 340,
     pastePending: [],
     calendarCategoryFilter: null, // null = 전체, 아니면 category id
@@ -614,12 +624,60 @@
 
   // ---------------- Auth ----------------
 
+  const INPUT_COLOR_KEY_LIGHT = 'aiden_input_color_light';
+  const INPUT_COLOR_KEY_DARK = 'aiden_input_color_dark';
+  const DEFAULT_INPUT_COLOR_LIGHT = '#FFF3D6';
+  const DEFAULT_INPUT_COLOR_DARK = '#463b16';
+
+  function hexToRgb(hex){
+    hex = String(hex).replace('#','');
+    if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+    const num = parseInt(hex,16);
+    return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+  }
+  function rgbToHex(r,g,b){
+    const c = v=> Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0');
+    return `#${c(r)}${c(g)}${c(b)}`;
+  }
+  function adjustColor(hex, amt){
+    const { r, g, b } = hexToRgb(hex);
+    const f = v => amt>=0 ? v + (255-v)*amt/100 : v + v*amt/100;
+    return rgbToHex(f(r), f(g), f(b));
+  }
+
+  function getInputColor(theme){
+    const key = theme==='dark' ? INPUT_COLOR_KEY_DARK : INPUT_COLOR_KEY_LIGHT;
+    const fallback = theme==='dark' ? DEFAULT_INPUT_COLOR_DARK : DEFAULT_INPUT_COLOR_LIGHT;
+    try{ return localStorage.getItem(key) || fallback; }catch(e){ return fallback; }
+  }
+  function setInputColor(theme, hex){
+    const key = theme==='dark' ? INPUT_COLOR_KEY_DARK : INPUT_COLOR_KEY_LIGHT;
+    try{ localStorage.setItem(key, hex); }catch(e){}
+    applyInputColorVars();
+  }
+  function resetInputColor(theme){
+    const key = theme==='dark' ? INPUT_COLOR_KEY_DARK : INPUT_COLOR_KEY_LIGHT;
+    try{ localStorage.removeItem(key); }catch(e){}
+    applyInputColorVars();
+  }
+  function applyInputColorVars(){
+    const theme = getTheme();
+    const bg = getInputColor(theme);
+    const border = adjustColor(bg, theme==='dark' ? 45 : -35);
+    const hover = adjustColor(bg, theme==='dark' ? 15 : -12);
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty('--input-bg', bg);
+    rootStyle.setProperty('--input-bg-hover', hover);
+    rootStyle.setProperty('--input-border', border);
+  }
+
   function getTheme(){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
   function toggleTheme(){
     const next = getTheme() === 'dark' ? 'light' : 'dark';
     if(next === 'dark') document.documentElement.setAttribute('data-theme','dark');
     else document.documentElement.removeAttribute('data-theme');
     try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+    applyInputColorVars();
   }
 
   function loadSession(){ try{ const raw = localStorage.getItem(SESSION_KEY); if(raw) return JSON.parse(raw); }catch(e){} return null; }
@@ -2043,6 +2101,14 @@
         }
       });
 
+      evStart.addEventListener('input', ()=>{
+        if(evAllDay.checked || !evStart.value) return;
+        const startDt = new Date(evStart.value);
+        if(isNaN(startDt.getTime())) return;
+        const endDt = new Date(startDt.getTime() + 60*60*1000);
+        evEnd.value = `${endDt.getFullYear()}-${pad(endDt.getMonth()+1)}-${pad(endDt.getDate())}T${pad(endDt.getHours())}:${pad(endDt.getMinutes())}`;
+      });
+
       if(evRepeat) evRepeat.addEventListener('change', ()=>{
         evRepeatUntilWrap.style.display = evRepeat.value === 'weekly' ? '' : 'none';
       });
@@ -2158,6 +2224,20 @@
 
   // ---------------- 렌더링: 전체 앱(탭 포함) ----------------
 
+  function renderColorSettingsPanel(){
+    if(!state.colorSettingsOpen) return '';
+    const lightColor = getInputColor('light');
+    const darkColor = getInputColor('dark');
+    return `
+      <div class="color-settings-panel">
+        <div class="cs-title">출퇴근 · 연차 입력창 색상</div>
+        <div class="cs-field"><label for="csLightColor">라이트 모드</label><input type="color" id="csLightColor" value="${lightColor}"></div>
+        <div class="cs-field"><label for="csDarkColor">다크 모드</label><input type="color" id="csDarkColor" value="${darkColor}"></div>
+        <button type="button" class="cs-reset-btn" id="csResetBtn">기본값으로</button>
+      </div>
+    `;
+  }
+
   function renderApp(){
     startLiveTick();
     const subLabel = state.tab==='attendance'
@@ -2172,6 +2252,7 @@
           <div class="sub">${subLabel} · <span id="save-flag" class="save-flag">저장됨</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button class="theme-toggle" id="colorSettingsBtn" title="출퇴근·연차 입력창 색상 설정">🎨</button>
           <button class="theme-toggle" id="themeToggleBtn" title="다크/라이트 모드 전환">${getTheme()==='dark' ? '☀' : '☾'}</button>
           <div class="user-chip">${state.user.name}님 <button id="logoutBtn">로그아웃</button></div>
           ${state.tab==='attendance' ? `
@@ -2182,6 +2263,8 @@
           </div>` : ''}
         </div>
       </div>
+
+      ${renderColorSettingsPanel()}
 
       <div class="tab-nav">
         <button class="tab-btn ${state.tab==='attendance' ? 'active' : ''}" id="tabAttendance">근태 관리</button>
@@ -2196,6 +2279,13 @@
 
     document.getElementById('logoutBtn').onclick = logout;
     document.getElementById('themeToggleBtn').onclick = ()=>{ toggleTheme(); render(); };
+    document.getElementById('colorSettingsBtn').onclick = ()=>{ state.colorSettingsOpen = !state.colorSettingsOpen; render(); };
+    const csLightColor = document.getElementById('csLightColor');
+    if(csLightColor) csLightColor.addEventListener('input', ()=>{ setInputColor('light', csLightColor.value); });
+    const csDarkColor = document.getElementById('csDarkColor');
+    if(csDarkColor) csDarkColor.addEventListener('input', ()=>{ setInputColor('dark', csDarkColor.value); });
+    const csResetBtn = document.getElementById('csResetBtn');
+    if(csResetBtn) csResetBtn.addEventListener('click', ()=>{ resetInputColor('light'); resetInputColor('dark'); render(); });
     document.getElementById('tabAttendance').onclick = ()=>{ state.tab='attendance'; render(); };
     document.getElementById('tabTodo').onclick = ()=>{ state.tab='todo'; render(); };
     document.getElementById('tabNotes').onclick = ()=>{ state.tab='notes'; render(); };
@@ -2254,6 +2344,7 @@
   (async function init(){
     loadTodoPanelWidth();
     loadMiniCalRowHeight();
+    applyInputColorVars();
     const session = loadSession();
     if(session && session.id){
       state.user = session;
