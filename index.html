@@ -212,9 +212,11 @@
   .new-cat-row input{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;}
   .new-cat-row input:focus{outline:2px solid var(--accent);outline-offset:1px;}
 
-  .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);row-gap:16px;column-gap:3px;font-size:12.5px;text-align:center;}
+  .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:24px;grid-auto-rows:62px;row-gap:16px;column-gap:3px;font-size:12.5px;text-align:center;}
+  .mini-cal-resizer{height:12px;cursor:row-resize;display:flex;align-items:center;justify-content:center;color:#c7cdcb;font-size:12px;letter-spacing:2px;user-select:none;margin-top:2px;}
+  .mini-cal-resizer:hover, .mini-cal-resizer.dragging{color:var(--accent);}
   .mini-cal .dow{color:#8b9298;font-weight:700;padding:4px 0;}
-  .mini-cal .day{padding:9px 0;border-radius:7px;cursor:pointer;position:relative;}
+  .mini-cal .day{padding-top:9px;border-radius:7px;cursor:pointer;position:relative;}
   .mini-cal .day:hover{background:var(--accent-soft);}
   .mini-cal .day.selected{background:var(--accent);color:#fff;font-weight:700;}
   .mini-cal .day.today{box-shadow:inset 0 0 0 1.5px var(--accent);}
@@ -223,9 +225,9 @@
   .mini-cal .day.empty{visibility:hidden;cursor:default;}
   .mcal-wrap{position:relative;}
   .mcal-bars-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;}
-  .mcal-bar{position:absolute;height:16px;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:4px;overflow:hidden;}
-  .mcal-bar .mcal-line{flex:1;height:1px;background:currentColor;min-width:3px;}
-  .mcal-bar .mcal-title{font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+  .mcal-bar{position:absolute;height:16px;pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .mcal-bar::before{content:'';position:absolute;left:0;right:0;top:50%;height:2px;background:currentColor;transform:translateY(-50%);}
+  .mcal-bar .mcal-title{position:relative;background:var(--panel);padding:0 6px;font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
   .event-dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin:0 1px;}
 
   .cal-add-form{display:flex;flex-direction:column;gap:8px;margin:14px 0;padding-top:14px;border-top:1px solid #F0F2F1;}
@@ -240,14 +242,6 @@
   .cal-selected-label{font-size:13px;font-weight:700;color:#54606a;margin:14px 0 8px 0;}
   .cal-allday-section{margin-bottom:10px;}
   .cal-allday-chip{display:inline-block;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;border-radius:6px;padding:5px 10px;margin:0 6px 6px 0;}
-
-  .cal-timeline{position:relative;height:1200px;overflow-y:auto;max-height:460px;border:1px solid var(--line);border-radius:8px;background:#fff;}
-  .cal-timeline-resizer{height:12px;cursor:row-resize;display:flex;align-items:center;justify-content:center;color:#c7cdcb;font-size:12px;letter-spacing:2px;user-select:none;}
-  .cal-timeline-resizer:hover, .cal-timeline-resizer.dragging{color:var(--accent);}
-  .cal-hour-row{position:absolute;left:0;right:0;height:50px;border-top:1px solid #F0F2F1;}
-  .cal-hour-label{position:absolute;left:5px;top:-7px;font-size:10px;color:#b7bec2;background:#fff;padding:0 2px;}
-  .cal-event-bar{position:absolute;left:50px;right:8px;background:var(--accent);color:#fff;border-radius:7px;padding:4px 8px;font-size:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.15);cursor:pointer;}
-  .cal-event-bar .loc{font-size:10.5px;opacity:.85;display:block;}
 
   .cal-event-list{margin-top:12px;}
   .cal-event-list-item{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:7px 2px;border-bottom:1px solid #EEF1F0;gap:8px;}
@@ -276,7 +270,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v1.0.0.1';
+  const APP_VERSION = 'v1.0.0.2';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -292,7 +286,8 @@
   const STATUS_ORDER = ['pending','in_progress','done'];
   const STATUS_ICON = { pending:'', in_progress:'●', done:'✓' };
   const DOW_LABEL = ['일','월','화','수','목','금','토'];
-  const CATEGORY_COLORS = ['#0F6E5B','#2B5FAD','#C0392B','#E08E00','#8E44AD','#16A085','#D35400','#34495E','#C2185B','#00838F'];
+  const CATEGORY_COLORS = ['#2B5FAD','#C0392B','#E08E00','#8E44AD','#16A085','#D35400','#34495E','#C2185B','#00838F','#6B4226'];
+  const NO_CATEGORY_COLOR = '#9aa3ac';
 
   let state = {
     year: 2026, month: 7, days: {},
@@ -303,7 +298,7 @@
     todoPanelWidth: 340,
     pastePending: [],
     calendarCategoryFilter: null, // null = 전체, 아니면 category id
-    calendarTimelineHeight: 460,
+    miniCalRowHeight: 62,
     multiDayEventsForRender: []
   };
 
@@ -400,58 +395,59 @@
     }, { passive:true });
   }
 
-  // ---- 캘린더 타임라인 높이 조절 ----
-  const TIMELINE_HEIGHT_KEY = 'cal_timeline_height';
-  function loadTimelineHeight(){
+  // ---- 캘린더 각 날짜 칸 높이 조절 ----
+  const MINI_CAL_ROW_KEY = 'cal_row_height';
+  function loadMiniCalRowHeight(){
     try{
-      const v = localStorage.getItem(TIMELINE_HEIGHT_KEY);
-      if(v) state.calendarTimelineHeight = Math.max(200, Math.min(Number(v), 1200));
+      const v = localStorage.getItem(MINI_CAL_ROW_KEY);
+      if(v) state.miniCalRowHeight = Math.max(36, Math.min(Number(v), 160));
     }catch(e){ /* ignore */ }
   }
-  function saveTimelineHeight(){
-    try{ localStorage.setItem(TIMELINE_HEIGHT_KEY, String(Math.round(state.calendarTimelineHeight))); }catch(e){ /* ignore */ }
+  function saveMiniCalRowHeight(){
+    try{ localStorage.setItem(MINI_CAL_ROW_KEY, String(Math.round(state.miniCalRowHeight))); }catch(e){ /* ignore */ }
   }
-  let tlDragging = false, tlStartY = 0, tlStartHeight = 0, tlWindowListenersAdded = false;
-  function ensureTimelineWindowListeners(){
-    if(tlWindowListenersAdded) return;
-    tlWindowListenersAdded = true;
+  let mcRowDragging = false, mcRowStartY = 0, mcRowStartHeight = 0, mcRowWindowListenersAdded = false;
+  function ensureMiniCalRowWindowListeners(){
+    if(mcRowWindowListenersAdded) return;
+    mcRowWindowListenersAdded = true;
     function move(clientY){
-      if(!tlDragging) return;
-      const el = document.getElementById('calTimeline');
+      if(!mcRowDragging) return;
+      const el = document.querySelector('.mini-cal');
       if(!el) return;
-      let newH = tlStartHeight + (clientY - tlStartY);
-      newH = Math.max(200, Math.min(newH, 1200));
-      el.style.maxHeight = newH + 'px';
-      state.calendarTimelineHeight = newH;
+      let newH = mcRowStartHeight + (clientY - mcRowStartY);
+      newH = Math.max(36, Math.min(newH, 160));
+      el.style.gridAutoRows = newH + 'px';
+      state.miniCalRowHeight = newH;
+      positionMultiDayBars();
     }
     function end(){
-      if(!tlDragging) return;
-      tlDragging = false;
-      const handle = document.getElementById('calTimelineResizer');
+      if(!mcRowDragging) return;
+      mcRowDragging = false;
+      const handle = document.getElementById('miniCalResizer');
       if(handle) handle.classList.remove('dragging');
       document.body.style.userSelect = '';
-      saveTimelineHeight();
+      saveMiniCalRowHeight();
     }
     window.addEventListener('mousemove', e=>move(e.clientY));
     window.addEventListener('mouseup', end);
-    window.addEventListener('touchmove', e=>{ if(tlDragging && e.touches[0]) move(e.touches[0].clientY); }, { passive:true });
+    window.addEventListener('touchmove', e=>{ if(mcRowDragging && e.touches[0]) move(e.touches[0].clientY); }, { passive:true });
     window.addEventListener('touchend', end);
   }
-  function attachTimelineResizer(){
-    ensureTimelineWindowListeners();
-    const handle = document.getElementById('calTimelineResizer');
+  function attachMiniCalResizer(){
+    ensureMiniCalRowWindowListeners();
+    const handle = document.getElementById('miniCalResizer');
     if(!handle) return;
     handle.addEventListener('mousedown', e=>{
-      tlDragging = true; tlStartY = e.clientY;
-      tlStartHeight = document.getElementById('calTimeline').getBoundingClientRect().height;
+      mcRowDragging = true; mcRowStartY = e.clientY;
+      mcRowStartHeight = state.miniCalRowHeight;
       handle.classList.add('dragging');
       document.body.style.userSelect = 'none';
       e.preventDefault();
     });
     handle.addEventListener('touchstart', e=>{
       if(!e.touches[0]) return;
-      tlDragging = true; tlStartY = e.touches[0].clientY;
-      tlStartHeight = document.getElementById('calTimeline').getBoundingClientRect().height;
+      mcRowDragging = true; mcRowStartY = e.touches[0].clientY;
+      mcRowStartHeight = state.miniCalRowHeight;
       handle.classList.add('dragging');
     }, { passive:true });
   }
@@ -743,7 +739,7 @@
 
   function categoryColor(catId){
     const cat = state.todoCategories.find(c=>c.id===catId);
-    return (cat && cat.color) || 'var(--accent)';
+    return (cat && cat.color) || NO_CATEGORY_COLOR;
   }
 
   async function reorderCategories(newOrderIds){
@@ -1269,7 +1265,7 @@
     const isEditing = state.todoCatEditing === activeCat.id;
     const tabsHtml = state.todoCategories.map(c=>`
       <button class="subtab-btn ${c.id===activeCat.id ? 'active' : ''}" data-cat="${c.id}" draggable="true">
-        <span class="cat-dot" style="background:${c.color || 'var(--accent)'};"></span>${escapeHtml(c.name)}
+        <span class="cat-dot" style="background:${c.color || NO_CATEGORY_COLOR};"></span>${escapeHtml(c.name)}
       </button>
     `).join('') + `<button class="subtab-btn add-new" id="newTaskTabBtn">+ 과제</button>`;
 
@@ -1294,7 +1290,7 @@
         <div class="task-header">
           ${isEditing
             ? `<input type="text" class="title-edit" id="taskTitleEdit" value="${escapeHtml(activeCat.name)}" maxlength="40">`
-            : `<h2><span class="cat-dot" style="background:${activeCat.color || 'var(--accent)'};"></span>${escapeHtml(activeCat.name)}</h2>`}
+            : `<h2><span class="cat-dot" style="background:${activeCat.color || NO_CATEGORY_COLOR};"></span>${escapeHtml(activeCat.name)}</h2>`}
           <div class="task-actions">
             ${isEditing
               ? `<button id="taskSaveBtn">저장</button><button id="taskCancelBtn">취소</button>`
@@ -1366,7 +1362,7 @@
         const clipStart = s < monthStart ? monthStart : s;
         const clipEnd = en > monthEnd ? monthEnd : en;
         return { id: e.id, title: e.title, startDay: clipStart.getDate(), endDay: clipEnd.getDate(),
-          color: e.category_id ? categoryColor(e.category_id) : 'var(--accent)' };
+          color: e.category_id ? categoryColor(e.category_id) : NO_CATEGORY_COLOR };
       })
       .filter(e => e.startDay <= e.endDay);
   }
@@ -1416,17 +1412,10 @@
     });
 
     overlay.innerHTML = allSegments.map(seg=>`
-      <div class="mcal-bar" style="left:${seg.left}px;width:${seg.width}px;top:${seg.top + seg.lane*(barH+barGap)}px;color:${seg.color};" data-event="${seg.id}" title="${escapeHtml(seg.title)}">
-        <span class="mcal-line"></span><span class="mcal-title">${escapeHtml(seg.title)}</span><span class="mcal-line"></span>
+      <div class="mcal-bar" style="left:${seg.left}px;width:${seg.width}px;top:${seg.top + seg.lane*(barH+barGap)}px;color:${seg.color};" title="${escapeHtml(seg.title)}">
+        <span class="mcal-title">${escapeHtml(seg.title)}</span>
       </div>
     `).join('');
-
-    document.querySelectorAll('.mcal-bar').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        const id = el.getAttribute('data-event');
-        if(id) deleteCalendarEvent(id);
-      });
-    });
   }
 
   function renderCalendarPanel(){
@@ -1467,7 +1456,7 @@
       <button class="cal-filter-btn ${!filterCatId ? 'active' : ''}" data-filter="">전체</button>
       ${state.todoCategories.map(c=>`
         <button class="cal-filter-btn ${filterCatId===c.id ? 'active' : ''}" data-filter="${c.id}">
-          <span class="cat-dot" style="background:${c.color || 'var(--accent)'};"></span>${escapeHtml(c.name)}
+          <span class="cat-dot" style="background:${c.color || NO_CATEGORY_COLOR};"></span>${escapeHtml(c.name)}
         </button>
       `).join('')}
     `;
@@ -1484,31 +1473,12 @@
     }).sort((a,b)=> new Date(a.start_at) - new Date(b.start_at));
 
     const allDayEvents = dayEventsAll.filter(e=>e.all_day);
-    const timedEvents = dayEventsAll.filter(e=>!e.all_day);
-
-    const hourRows = [];
-    for(let h=0; h<24; h++){ hourRows.push(`<div class="cal-hour-row" style="top:${h*50}px;"><span class="cal-hour-label">${pad(h)}:00</span></div>`); }
-    const pxPerMin = 50/60;
-    const eventBars = timedEvents.map(e=>{
-      const s = new Date(e.start_at), en = new Date(e.end_at);
-      const clipStart = s < dayStart ? dayStart : s;
-      const clipEnd = en > dayEnd ? dayEnd : en;
-      const startMin = clipStart.getHours()*60 + clipStart.getMinutes();
-      let endMin = clipEnd.getHours()*60 + clipEnd.getMinutes();
-      if(endMin <= startMin) endMin = startMin + 20;
-      const top = startMin * pxPerMin;
-      const height = Math.max(22, (endMin - startMin) * pxPerMin);
-      const color = e.category_id ? categoryColor(e.category_id) : 'var(--accent)';
-      return `<div class="cal-event-bar" style="top:${top}px;height:${height}px;background:${color};" data-event="${e.id}" title="${escapeHtml(e.title)}">
-        ${escapeHtml(e.title)}${e.location ? `<span class="loc">${escapeHtml(e.location)}</span>` : ''}
-      </div>`;
-    }).join('');
 
     const allDayHtml = allDayEvents.length > 0 ? `
       <div class="cal-allday-section">
         ${allDayEvents.map(e=>{
-          const color = e.category_id ? categoryColor(e.category_id) : 'var(--accent)';
-          return `<span class="cal-allday-chip" style="background:${color};" data-event="${e.id}" title="클릭해서 삭제">종일 · ${escapeHtml(e.title)}${e.location ? ' · '+escapeHtml(e.location) : ''}</span>`;
+          const color = e.category_id ? categoryColor(e.category_id) : NO_CATEGORY_COLOR;
+          return `<span class="cal-allday-chip" style="background:${color};" data-event="${e.id}" title="${escapeHtml(e.title)}">종일 · ${escapeHtml(e.title)}${e.location ? ' · '+escapeHtml(e.location) : ''}</span>`;
         }).join('')}
       </div>
     ` : '';
@@ -1525,12 +1495,13 @@
         </div>
         ${state.todoCategories.length > 0 ? `<div class="cal-filter-nav">${filterTabsHtml}</div>` : ''}
         <div class="mcal-wrap" id="mcalWrap">
-          <div class="mini-cal">
+          <div class="mini-cal" style="grid-auto-rows:${state.miniCalRowHeight}px;">
             ${DOW_LABEL.map(d=>`<div class="dow">${d}</div>`).join('')}
             ${cells}
           </div>
           <div class="mcal-bars-overlay" id="mcalBarsOverlay"></div>
         </div>
+        <div class="mini-cal-resizer" id="miniCalResizer" title="드래그해서 날짜 칸 높이 조절">⋯</div>
 
         <div class="cal-add-form">
           <div><label>제목</label><input type="text" id="evTitle" placeholder="일정 제목" maxlength="80"></div>
@@ -1544,11 +1515,6 @@
 
         <div class="cal-selected-label">${selDate} 일정</div>
         ${allDayHtml}
-        <div class="cal-timeline" id="calTimeline" style="max-height:${state.calendarTimelineHeight}px;">
-          ${hourRows.join('')}
-          ${eventBars}
-        </div>
-        <div class="cal-timeline-resizer" id="calTimelineResizer" title="드래그해서 높이 조절">⋯</div>
         <div class="cal-event-list">${listHtml}</div>
       </div>
     `;
@@ -1566,7 +1532,7 @@
 
   function attachTodoHandlers(){
     attachResizerHandlers();
-    attachTimelineResizer();
+    attachMiniCalResizer();
     positionMultiDayBars();
     const newCatInput = document.getElementById('newCategoryInput');
     const addCatBtn = document.getElementById('addCategoryBtn');
@@ -1756,13 +1722,6 @@
       });
     }
 
-    document.querySelectorAll('.cal-event-bar, .cal-allday-chip').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        const id = el.getAttribute('data-event');
-        if(id) deleteCalendarEvent(id);
-      });
-    });
-
     document.querySelectorAll('.cal-filter-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         state.calendarCategoryFilter = btn.getAttribute('data-filter') || null;
@@ -1912,7 +1871,7 @@
 
   (async function init(){
     loadTodoPanelWidth();
-    loadTimelineHeight();
+    loadMiniCalRowHeight();
     const session = loadSession();
     if(session && session.id){
       state.user = session;
