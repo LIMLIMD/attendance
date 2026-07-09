@@ -126,7 +126,7 @@
   input.time-input.invalid{border-color:var(--minus);background:var(--danger-bg);}
   select.leave-input:hover, input.time-input:hover{background:var(--input-bg-hover);}
   select.leave-input:focus, input.time-input:focus{outline:2px solid var(--accent);outline-offset:1px;}
-  input.time-input.live-preview{background:var(--live-bg);color:var(--live-color);border-color:var(--live-border);}
+  input.time-input.live-preview{background:var(--live-bg);color:var(--family-text);border-color:var(--live-border);}
   input.time-input.live-preview:hover{background:var(--live-bg-hover);}
 
   .family-cell{background:var(--live-bg) !important;border-radius:4px;font-weight:700;color:var(--family-text);}
@@ -381,20 +381,28 @@
   }
   html[data-theme="dark"] thead th{background:var(--surface2);}
   html[data-theme="dark"] tfoot td{background:var(--surface2);}
-  html[data-theme="dark"] .family-cell{background:#1E3038 !important;color:var(--family-text);}
-  html[data-theme="dark"] .family-tag{background:#1E3038;color:var(--family-text);}
   html[data-theme="dark"] input.time-input.invalid{background:#3A2222;}
   html[data-theme="dark"] .note-card.expanded{box-shadow:0 2px 10px var(--shadow-soft);}
   html[data-theme="dark"] ::placeholder{color:var(--muted5);opacity:1;}
   html[data-theme="dark"] select.leave-input, html[data-theme="dark"] input.time-input:not(.live-preview){color:#fff;}
 
   /* ---- 입력창 색상 설정 패널 ---- */
-  .color-settings-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;}
-  .color-settings-panel .cs-title{font-size:12px;font-weight:700;color:var(--text2);width:100%;}
-  .cs-field{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text2);font-weight:600;}
-  .cs-field input[type=color]{width:34px;height:30px;border:1px solid var(--line);border-radius:6px;padding:2px;background:var(--panel);cursor:pointer;}
-  .cs-reset-btn{border:none;background:var(--surface2);color:var(--text2);font-size:11.5px;font-weight:700;border-radius:6px;padding:6px 10px;cursor:pointer;}
+  .color-settings-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+  .color-settings-panel .cs-title{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;}
+  .cs-row{display:grid;grid-template-columns:120px 1fr 1fr 70px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border-light);}
+  .cs-row:last-child{border-bottom:none;}
+  .cs-row-label{font-size:12.5px;font-weight:700;color:var(--ink);}
+  .cs-field{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted3);font-weight:600;}
+  .cs-field input[type=color]{width:32px;height:28px;border:1px solid var(--line);border-radius:6px;padding:2px;background:var(--panel);cursor:pointer;flex-shrink:0;}
+  .cs-reset-btn{border:none;background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;border-radius:6px;padding:6px 8px;cursor:pointer;white-space:nowrap;}
   .cs-reset-btn:hover{background:var(--surface-hover);}
+  @media(max-width:640px){
+    .cs-row{grid-template-columns:1fr 1fr;grid-template-areas:"label label" "light dark" "reset reset";}
+    .cs-row-label{grid-area:label;}
+    .cs-row .cs-field:nth-of-type(1){grid-area:light;}
+    .cs-row .cs-field:nth-of-type(2){grid-area:dark;}
+    .cs-row .cs-reset-btn{grid-area:reset;width:100%;}
+  }
 </style>
 </head>
 <body>
@@ -415,7 +423,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v1.0.2.2';
+  const APP_VERSION = 'v26.2.0.0';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -624,11 +632,6 @@
 
   // ---------------- Auth ----------------
 
-  const INPUT_COLOR_KEY_LIGHT = 'aiden_input_color_light';
-  const INPUT_COLOR_KEY_DARK = 'aiden_input_color_dark';
-  const DEFAULT_INPUT_COLOR_LIGHT = '#FFF3D6';
-  const DEFAULT_INPUT_COLOR_DARK = '#463b16';
-
   function hexToRgb(hex){
     hex = String(hex).replace('#','');
     if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
@@ -644,31 +647,113 @@
     const f = v => amt>=0 ? v + (255-v)*amt/100 : v + v*amt/100;
     return rgbToHex(f(r), f(g), f(b));
   }
+  function relLuminance(hex){
+    const { r, g, b } = hexToRgb(hex);
+    const lin = v => { v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); };
+    return 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+  }
+  function hexToHsl(hex){
+    const { r, g, b } = hexToRgb(hex);
+    const rr=r/255, gg=g/255, bb=b/255;
+    const max=Math.max(rr,gg,bb), min=Math.min(rr,gg,bb);
+    let h, s, l=(max+min)/2;
+    if(max===min){ h=s=0; }
+    else{
+      const d = max-min;
+      s = l>0.5 ? d/(2-max-min) : d/(max+min);
+      switch(max){
+        case rr: h=(gg-bb)/d+(gg<bb?6:0); break;
+        case gg: h=(bb-rr)/d+2; break;
+        default: h=(rr-gg)/d+4;
+      }
+      h/=6;
+    }
+    return { h: h*360, s: s*100, l: l*100 };
+  }
+  function hslToHex(h,s,l){
+    h=((h%360)+360)%360; s=Math.max(0,Math.min(100,s))/100; l=Math.max(0,Math.min(100,l))/100;
+    const c=(1-Math.abs(2*l-1))*s;
+    const x=c*(1-Math.abs((h/60)%2-1));
+    const m=l-c/2;
+    let r,g,b;
+    if(h<60){r=c;g=x;b=0;} else if(h<120){r=x;g=c;b=0;} else if(h<180){r=0;g=c;b=x;}
+    else if(h<240){r=0;g=x;b=c;} else if(h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+    return rgbToHex((r+m)*255, (g+m)*255, (b+m)*255);
+  }
+  // 패밀리데이 배경색과 같은 색상(hue)을 유지하면서 명도만 크게 이동시켜 텍스트/테두리 색을 만든다
+  function familyTextColor(bg){
+    const { h, s, l } = hexToHsl(bg);
+    const sat = Math.max(s, 55);
+    const targetL = l > 50 ? Math.max(20, l-56) : Math.min(80, l+54);
+    return hslToHex(h, sat, targetL);
+  }
+  function familyBorderColor(bg){
+    const { h, s, l } = hexToHsl(bg);
+    const sat = Math.max(s, 40);
+    const targetL = l > 50 ? Math.max(0, l-25) : Math.min(100, l+30);
+    return hslToHex(h, sat, targetL);
+  }
 
-  function getInputColor(theme){
-    const key = theme==='dark' ? INPUT_COLOR_KEY_DARK : INPUT_COLOR_KEY_LIGHT;
-    const fallback = theme==='dark' ? DEFAULT_INPUT_COLOR_DARK : DEFAULT_INPUT_COLOR_LIGHT;
-    try{ return localStorage.getItem(key) || fallback; }catch(e){ return fallback; }
+  const COLOR_ITEMS = [
+    { key:'bg', label:'배경색', defaultLight:'#F3F6F5', defaultDark:'#15181B' },
+    { key:'button', label:'버튼색', defaultLight:'#0F6E5B', defaultDark:'#2FBE9C' },
+    { key:'family', label:'패밀리데이색', defaultLight:'#D6EEF8', defaultDark:'#1E3038' },
+    { key:'text', label:'글자색', defaultLight:'#1B2430', defaultDark:'#EDEFF1' },
+    { key:'input', label:'출퇴근·연차 입력창', defaultLight:'#FFF3D6', defaultDark:'#463b16' }
+  ];
+  function colorStorageKey(itemKey, theme){ return `aiden_color_${itemKey}_${theme}`; }
+  function colorItemDefault(itemKey, theme){
+    const item = COLOR_ITEMS.find(i=>i.key===itemKey);
+    if(!item) return '#000000';
+    return theme==='dark' ? item.defaultDark : item.defaultLight;
   }
-  function setInputColor(theme, hex){
-    const key = theme==='dark' ? INPUT_COLOR_KEY_DARK : INPUT_COLOR_KEY_LIGHT;
-    try{ localStorage.setItem(key, hex); }catch(e){}
-    applyInputColorVars();
+  function getColorItem(itemKey, theme){
+    const fallback = colorItemDefault(itemKey, theme);
+    try{ return localStorage.getItem(colorStorageKey(itemKey, theme)) || fallback; }catch(e){ return fallback; }
   }
-  function resetInputColor(theme){
-    const key = theme==='dark' ? INPUT_COLOR_KEY_DARK : INPUT_COLOR_KEY_LIGHT;
-    try{ localStorage.removeItem(key); }catch(e){}
-    applyInputColorVars();
+  function setColorItem(itemKey, theme, hex){
+    try{ localStorage.setItem(colorStorageKey(itemKey, theme), hex); }catch(e){}
+    applyAllColorVars();
   }
-  function applyInputColorVars(){
+  function resetColorItem(itemKey){
+    try{
+      localStorage.removeItem(colorStorageKey(itemKey, 'light'));
+      localStorage.removeItem(colorStorageKey(itemKey, 'dark'));
+    }catch(e){}
+    applyAllColorVars();
+  }
+  function applyAllColorVars(){
     const theme = getTheme();
-    const bg = getInputColor(theme);
-    const border = adjustColor(bg, theme==='dark' ? 45 : -35);
-    const hover = adjustColor(bg, theme==='dark' ? 15 : -12);
     const rootStyle = document.documentElement.style;
-    rootStyle.setProperty('--input-bg', bg);
-    rootStyle.setProperty('--input-bg-hover', hover);
-    rootStyle.setProperty('--input-border', border);
+
+    // 배경색
+    const bg = getColorItem('bg', theme);
+    const panel = adjustColor(bg, theme==='dark' ? 12 : 60);
+    rootStyle.setProperty('--paper', bg);
+    rootStyle.setProperty('--panel', panel);
+
+    // 버튼색
+    const accent = getColorItem('button', theme);
+    rootStyle.setProperty('--accent', accent);
+    rootStyle.setProperty('--accent-soft', theme==='dark' ? adjustColor(accent, -55) : adjustColor(accent, 88));
+    rootStyle.setProperty('--accent-hover', adjustColor(accent, -12));
+
+    // 패밀리데이색 (퇴근시간 미입력 상태의 임시 표시 색상도 동일하게 적용)
+    const familyBg = getColorItem('family', theme);
+    const familyIsLight = relLuminance(familyBg) > 0.4;
+    rootStyle.setProperty('--live-bg', familyBg);
+    rootStyle.setProperty('--live-bg-hover', familyIsLight ? adjustColor(familyBg, -8) : adjustColor(familyBg, 12));
+    rootStyle.setProperty('--family-text', familyTextColor(familyBg));
+    rootStyle.setProperty('--live-border', familyBorderColor(familyBg));
+
+    // 글자색
+    rootStyle.setProperty('--ink', getColorItem('text', theme));
+
+    // 출퇴근·연차 입력창
+    const inputBg = getColorItem('input', theme);
+    rootStyle.setProperty('--input-bg', inputBg);
+    rootStyle.setProperty('--input-bg-hover', adjustColor(inputBg, theme==='dark' ? 15 : -12));
+    rootStyle.setProperty('--input-border', adjustColor(inputBg, theme==='dark' ? 45 : -35));
   }
 
   function getTheme(){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
@@ -677,7 +762,7 @@
     if(next === 'dark') document.documentElement.setAttribute('data-theme','dark');
     else document.documentElement.removeAttribute('data-theme');
     try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
-    applyInputColorVars();
+    applyAllColorVars();
   }
 
   function loadSession(){ try{ const raw = localStorage.getItem(SESSION_KEY); if(raw) return JSON.parse(raw); }catch(e){} return null; }
@@ -2226,14 +2311,18 @@
 
   function renderColorSettingsPanel(){
     if(!state.colorSettingsOpen) return '';
-    const lightColor = getInputColor('light');
-    const darkColor = getInputColor('dark');
+    const rowsHtml = COLOR_ITEMS.map(item => `
+      <div class="cs-row" data-color-key="${item.key}">
+        <div class="cs-row-label">${item.label}</div>
+        <div class="cs-field"><label>라이트</label><input type="color" class="cs-light-input" data-color-key="${item.key}" value="${getColorItem(item.key,'light')}"></div>
+        <div class="cs-field"><label>다크</label><input type="color" class="cs-dark-input" data-color-key="${item.key}" value="${getColorItem(item.key,'dark')}"></div>
+        <button type="button" class="cs-reset-btn" data-color-reset="${item.key}">기본값</button>
+      </div>
+    `).join('');
     return `
       <div class="color-settings-panel">
-        <div class="cs-title">출퇴근 · 연차 입력창 색상</div>
-        <div class="cs-field"><label for="csLightColor">라이트 모드</label><input type="color" id="csLightColor" value="${lightColor}"></div>
-        <div class="cs-field"><label for="csDarkColor">다크 모드</label><input type="color" id="csDarkColor" value="${darkColor}"></div>
-        <button type="button" class="cs-reset-btn" id="csResetBtn">기본값으로</button>
+        <div class="cs-title">테마 색상 설정 (라이트 · 다크 모드 각각 지정)</div>
+        ${rowsHtml}
       </div>
     `;
   }
@@ -2252,7 +2341,7 @@
           <div class="sub">${subLabel} · <span id="save-flag" class="save-flag">저장됨</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button class="theme-toggle" id="colorSettingsBtn" title="출퇴근·연차 입력창 색상 설정">🎨</button>
+          <button class="theme-toggle" id="colorSettingsBtn" title="테마 색상 설정">🎨</button>
           <button class="theme-toggle" id="themeToggleBtn" title="다크/라이트 모드 전환">${getTheme()==='dark' ? '☀' : '☾'}</button>
           <div class="user-chip">${state.user.name}님 <button id="logoutBtn">로그아웃</button></div>
           ${state.tab==='attendance' ? `
@@ -2280,12 +2369,15 @@
     document.getElementById('logoutBtn').onclick = logout;
     document.getElementById('themeToggleBtn').onclick = ()=>{ toggleTheme(); render(); };
     document.getElementById('colorSettingsBtn').onclick = ()=>{ state.colorSettingsOpen = !state.colorSettingsOpen; render(); };
-    const csLightColor = document.getElementById('csLightColor');
-    if(csLightColor) csLightColor.addEventListener('input', ()=>{ setInputColor('light', csLightColor.value); });
-    const csDarkColor = document.getElementById('csDarkColor');
-    if(csDarkColor) csDarkColor.addEventListener('input', ()=>{ setInputColor('dark', csDarkColor.value); });
-    const csResetBtn = document.getElementById('csResetBtn');
-    if(csResetBtn) csResetBtn.addEventListener('click', ()=>{ resetInputColor('light'); resetInputColor('dark'); render(); });
+    document.querySelectorAll('.cs-light-input').forEach(el=>{
+      el.addEventListener('input', ()=>{ setColorItem(el.getAttribute('data-color-key'), 'light', el.value); });
+    });
+    document.querySelectorAll('.cs-dark-input').forEach(el=>{
+      el.addEventListener('input', ()=>{ setColorItem(el.getAttribute('data-color-key'), 'dark', el.value); });
+    });
+    document.querySelectorAll('[data-color-reset]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ resetColorItem(btn.getAttribute('data-color-reset')); render(); });
+    });
     document.getElementById('tabAttendance').onclick = ()=>{ state.tab='attendance'; render(); };
     document.getElementById('tabTodo').onclick = ()=>{ state.tab='todo'; render(); };
     document.getElementById('tabNotes').onclick = ()=>{ state.tab='notes'; render(); };
@@ -2344,7 +2436,7 @@
   (async function init(){
     loadTodoPanelWidth();
     loadMiniCalRowHeight();
-    applyInputColorVars();
+    applyAllColorVars();
     const session = loadSession();
     if(session && session.id){
       state.user = session;
