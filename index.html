@@ -423,7 +423,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v26.2.0.0';
+  const APP_VERSION = 'v26.07.0.1';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -1189,11 +1189,12 @@
 
   let flashTimer=null;
   let liveTick=null;
+  let noteSaveTimers={};
   function startLiveTick(){
     if(liveTick) return;
     liveTick = setInterval(()=>{
       const active = document.activeElement;
-      if(active && (active.tagName === 'INPUT' || active.tagName === 'SELECT')) return;
+      if(active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return;
       render();
     }, 30000);
   }
@@ -2003,9 +2004,17 @@
     });
 
     document.querySelectorAll('[data-note-content]').forEach(el=>{
-      el.addEventListener('change', async ()=>{
+      el.addEventListener('input', ()=>{
         const id = el.getAttribute('data-note-content');
-        await updateNotepad(id, { content: el.value });
+        const note = state.notepads.find(n=>n.id===id);
+        if(note) note.content = el.value; // 즉시 로컬 상태에 반영 — 도중에 다시 렌더링돼도 입력 중인 내용이 사라지지 않도록
+        clearTimeout(noteSaveTimers[id]);
+        noteSaveTimers[id] = setTimeout(()=>{ updateNotepad(id, { content: el.value }); }, 900);
+      });
+      el.addEventListener('blur', ()=>{
+        const id = el.getAttribute('data-note-content');
+        clearTimeout(noteSaveTimers[id]);
+        updateNotepad(id, { content: el.value });
       });
     });
   }
