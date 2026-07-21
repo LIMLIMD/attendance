@@ -123,6 +123,8 @@
   }
   select.leave-input{width:82px;}
   input.time-input{width:78px;}
+  .checkout-cell{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;}
+  .ot10-badge{font-size:8.5px;color:var(--muted3);font-weight:700;white-space:nowrap;flex-shrink:0;display:inline-block;width:32px;text-align:left;}
   input.time-input.invalid{border-color:var(--minus);background:var(--danger-bg);}
   select.leave-input:hover, input.time-input:hover{background:var(--input-bg-hover);}
   select.leave-input:focus, input.time-input:focus{outline:2px solid var(--accent);outline-offset:1px;}
@@ -416,14 +418,108 @@
   const SUPABASE_URL = 'https://tpjxiealovjlmyeqmupq.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_r5uArNLj0P4TBk8rPUnqqQ_hf-T2ZEC';
 
-  const supabase = (SUPABASE_URL.startsWith('http'))
+  let supabase = (SUPABASE_URL.startsWith('http') && window.supabase)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
+
+  // ---------------- 테스트 계정용 로컬 모의 백엔드 (서버 연동 없이 동작) ----------------
+  const TEST_ACCOUNT = { name: 'admin', pin: 'aiden8500' };
+  const MOCK_DB_KEY = 'aiden_mock_db_v1';
+  let mockDb = null;
+  function genMockId(){ return 'm_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+  function saveMockDb(){ try{ localStorage.setItem(MOCK_DB_KEY, JSON.stringify(mockDb)); }catch(e){} }
+  function seedMockDb(){
+    const uid = 'local-admin';
+    mockDb = {
+      att_users: [{ id: uid, name: TEST_ACCOUNT.name, pin: TEST_ACCOUNT.pin }],
+      att_days: [],
+      todo_categories: [{ id: genMockId(), user_id: uid, name: '업무', sort_order: 0, color: '#2B5FAD' }],
+      todo_items: [],
+      calendar_events: [],
+      notepads: []
+    };
+    saveMockDb();
+  }
+  function loadMockDb(){
+    try{
+      const raw = localStorage.getItem(MOCK_DB_KEY);
+      if(raw){ mockDb = JSON.parse(raw); return; }
+    }catch(e){}
+    seedMockDb();
+  }
+  class MockQueryBuilder{
+    constructor(table){
+      this.table = table;
+      this.op = 'select';
+      this.filters = [];
+      this.payload = null;
+      this.singleFlag = false;
+      this.orderCfg = null;
+      this.limitVal = null;
+    }
+    select(){ return this; }
+    eq(col, val){ this.filters.push(r=>r[col]===val); return this; }
+    in(col, arr){ this.filters.push(r=>arr.includes(r[col])); return this; }
+    gte(col, val){ this.filters.push(r=>r[col]>=val); return this; }
+    lte(col, val){ this.filters.push(r=>r[col]<=val); return this; }
+    lt(col, val){ this.filters.push(r=>r[col]<val); return this; }
+    limit(n){ this.limitVal = n; return this; }
+    order(col, opts){ this.orderCfg = { col, asc: !(opts && opts.ascending===false) }; return this; }
+    single(){ this.singleFlag = true; return this; }
+    insert(payload){ this.op = 'insert'; this.payload = Array.isArray(payload) ? payload : [payload]; return this; }
+    update(payload){ this.op = 'update'; this.payload = payload; return this; }
+    upsert(payload){ this.op = 'upsert'; this.payload = Array.isArray(payload) ? payload : [payload]; return this; }
+    delete(){ this.op = 'delete'; return this; }
+    _rows(){ if(!mockDb[this.table]) mockDb[this.table] = []; return mockDb[this.table]; }
+    _match(rows){ return rows.filter(r => this.filters.every(f=>f(r))); }
+    _run(){
+      const rows = this._rows();
+      let data = null;
+      if(this.op==='select'){
+        let out = this._match(rows);
+        if(this.orderCfg){
+          const { col, asc } = this.orderCfg;
+          out = out.slice().sort((a,b)=> (a[col]<b[col] ? -1 : a[col]>b[col] ? 1 : 0) * (asc ? 1 : -1));
+        }
+        if(this.limitVal!=null) out = out.slice(0, this.limitVal);
+        data = out;
+      } else if(this.op==='insert'){
+        const inserted = this.payload.map(p=>({ id: genMockId(), created_at: new Date().toISOString(), ...p }));
+        rows.push(...inserted);
+        data = inserted;
+      } else if(this.op==='update'){
+        const targets = this._match(rows);
+        targets.forEach(r=>Object.assign(r, this.payload));
+        data = targets;
+      } else if(this.op==='upsert'){
+        data = this.payload.map(p=>{
+          let existing = rows.find(r => r.user_id===p.user_id && r.date_key!==undefined && p.date_key!==undefined && r.date_key===p.date_key);
+          if(existing){ Object.assign(existing, p); return existing; }
+          const rec = { id: genMockId(), created_at: new Date().toISOString(), ...p };
+          rows.push(rec);
+          return rec;
+        });
+      } else if(this.op==='delete'){
+        const targets = this._match(rows);
+        mockDb[this.table] = rows.filter(r=>!targets.includes(r));
+        data = targets;
+      }
+      saveMockDb();
+      if(this.singleFlag) data = Array.isArray(data) ? (data[0] || null) : data;
+      return { data, error: null };
+    }
+    then(resolve){ resolve(this._run()); return Promise.resolve(); }
+    catch(){ return this; }
+  }
+  function createMockSupabaseClient(){
+    loadMockDb();
+    return { from(table){ return new MockQueryBuilder(table); } };
+  }
 
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v26.07.0.1';
+  const APP_VERSION = 'v26.7.0.3';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -623,6 +719,10 @@
     const h = Math.floor(abs/60), m = abs%60;
     return `${sign}${h}:${pad(m)}`;
   }
+  function formatHoursDecimal(mins){
+    const hours = Math.round((mins/60)*10)/10;
+    return String(hours);
+  }
   function planMinutes(dow){ return (dow>=1 && dow<=5) ? 480 : 0; }
   function nowTimeStr(){ const n = new Date(); return pad(n.getHours()) + ':' + pad(n.getMinutes()); }
   function effectiveDayData(data){
@@ -770,6 +870,11 @@
   function clearSession(){ try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
 
   async function login(name, pin){
+    if(name === TEST_ACCOUNT.name && pin === TEST_ACCOUNT.pin){
+      supabase = createMockSupabaseClient();
+      const u = mockDb.att_users[0];
+      return { ok:true, user:{ id: u.id, name: u.name } };
+    }
     if(!supabase) return { ok:false, message:'Supabase 연결 정보가 설정되지 않았어요.' };
     if(!name){ return { ok:false, message:'이름을 입력해주세요.' }; }
     if(!/^\d{4}$/.test(pin)){ return { ok:false, message:'PIN은 숫자 4자리로 입력해주세요.' }; }
@@ -852,11 +957,12 @@
     const leaveMin = LEAVE_MIN[data.leave || 'none'] || 0; // 월 "근무시간(실제)" 합계 표시용
     const inM = timeToMin(data.checkIn);
     const outM = timeToMin(data.checkOut); // 27:00처럼 24 이상도 그대로 분 단위로 변환됨
-    let dur=null, lunch=0, dinner=0, actual=null, overtimeEligible=false;
+    let dur=null, lunch=0, dinner=0, actual=null, overtimeEligible=false, after10pmMin=0;
     if(inM!=null && outM!=null){
       let outAdj = outM < inM ? outM + 24*60 : outM; // "03:00" 같은 소표기는 익일로 자동 보정
       const CAP = 22*60; // 22:00
       overtimeEligible = outAdj > CAP;
+      after10pmMin = Math.max(0, outAdj - CAP); // 22시 이후 실제 근무한 시간 (연장신청 체크와 무관하게 퇴근시각 기준)
       if(overtimeEligible && !data.overtime){ outAdj = CAP; } // 연장신청 없으면 22:00까지만 인정
       dur = Math.max(0, outAdj - inM);
       const isWeekdayForLunch = (dow>=1 && dow<=5) && !isPublicHoliday;
@@ -889,7 +995,7 @@
     const hasLeaveSelected = data.leave==='full' || data.leave==='half' || data.leave==='quarter';
     const statusCounts = !isHolidayWorkDay && (actual!=null || hasLeaveSelected);
     const dailyDiff = statusCounts ? (actual||0) - plan : 0;
-    return { plan, dur, lunch, dinner, actual, leaveMin, holidayWork, statusCounts, dailyDiff, overtimeEligible };
+    return { plan, dur, lunch, dinner, actual, leaveMin, holidayWork, statusCounts, dailyDiff, overtimeEligible, after10pmMin };
   }
 
   // ---------------- 출퇴근 기록 붙여넣기 인식 ----------------
@@ -1215,12 +1321,12 @@
           <h1>Aiden<span class="app-version">${APP_VERSION}</span></h1>
           <div class="desc">이름과 4자리 PIN으로 로그인하세요.</div>
           <div class="login-field"><label>이름</label><input id="loginName" type="text" placeholder="홍길동" maxlength="20"></div>
-          <div class="login-field"><label>PIN (숫자 4자리)</label><input id="loginPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••"></div>
+          <div class="login-field"><label>PIN (숫자 4자리)</label><input id="loginPin" type="password" inputmode="numeric" maxlength="20" placeholder="••••"></div>
           <button id="loginBtn" class="login-btn">로그인</button>
           <div id="loginError" class="login-error">${state.loginError || ''}</div>
           <div class="login-switch">계정이 없으신가요? <a href="#" id="goSignup">회원가입</a></div>
           <div class="login-switch">PIN을 바꾸고 싶으신가요? <a href="#" id="goChangePin">PIN 변경</a></div>
-          <div class="login-hint">${supabase ? '' : '⚠ 코드 상단의 SUPABASE_URL / SUPABASE_ANON_KEY를 먼저 채워주세요.'}</div>
+          <div class="login-hint">${supabase ? '' : '⚠ 코드 상단의 SUPABASE_URL / SUPABASE_ANON_KEY를 먼저 채워주세요.'}<br>테스트 계정(서버 연결 불필요): admin / aiden8500</div>
         </div>
       </div>
     `;
@@ -1230,6 +1336,10 @@
     const errEl = document.getElementById('loginError');
     let loginInFlight = false;
     pinEl.addEventListener('input', ()=>{
+      if(nameEl.value.trim() === TEST_ACCOUNT.name){
+        pinEl.value = pinEl.value.slice(0, 20);
+        return;
+      }
       pinEl.value = pinEl.value.replace(/[^0-9]/g,'').slice(0,4);
       if(pinEl.value.length === 4) doLogin();
     });
@@ -1365,7 +1475,16 @@
     const nDays = daysInMonth(y,m);
     const rows = [];
     let cumulative = 0;
-    let totals = { plan:0, dur:0, lunch:0, dinner:0, actual:0, holiday:0, leave:0 };
+    let totals = { plan:0, dur:0, lunch:0, dinner:0, actual:0, holiday:0, leave:0, after10pm:0 };
+
+    // 이번 달에 22시 이후 근무한 날이 하루라도 있으면, 전체 날짜의 노란 박스를 동일하게 왼쪽으로 이동시켜 정렬을 통일한다
+    let monthHasOvertime = false;
+    for(let d=1; d<=nDays; d++){
+      const dstr0 = dateKey(y,m,d);
+      const dow0 = new Date(y, m-1, d).getDay();
+      const c0 = computeDay(dow0, effectiveDayData(getDayData(dstr0)), isFamilyDay(y,m,d));
+      if(c0.after10pmMin > 0){ monthHasOvertime = true; break; }
+    }
 
     for(let d=1; d<=nDays; d++){
       const dstr = dateKey(y,m,d);
@@ -1378,6 +1497,7 @@
       if(c.statusCounts) cumulative += c.dailyDiff;
       totals.plan += c.plan; totals.dur += (c.dur||0); totals.lunch += c.lunch; totals.dinner += c.dinner;
       totals.actual += (c.actual||0); totals.holiday += c.holidayWork; totals.leave += c.leaveMin;
+      totals.after10pm += (c.after10pmMin||0);
 
       const isPublicHoliday = data.leave === 'holiday';
       const rowClass = isPublicHoliday ? 'weekend-sun' : (dow===6 ? 'weekend-sat' : (dow===0 ? 'weekend-sun' : ''));
@@ -1394,7 +1514,12 @@
           </td>
           <td class="mono">${c.plan>0 ? minToStr(c.plan) : '<span class="muted">-</span>'}</td>
           <td><input class="time-input" type="text" inputmode="numeric" placeholder="09:00" maxlength="5" data-field="checkIn" data-date="${dstr}" value="${data.checkIn||''}" tabindex="${tabIn}"></td>
-          <td><input class="time-input${isLive ? ' live-preview' : ''}" type="text" inputmode="numeric" placeholder="18:00" maxlength="5" data-field="checkOut" data-date="${dstr}" value="${isLive ? effData.checkOut : (data.checkOut||'')}" tabindex="${tabOut}"></td>
+          <td>
+            <div class="checkout-cell">
+              <input class="time-input${isLive ? ' live-preview' : ''}" type="text" inputmode="numeric" placeholder="18:00" maxlength="5" data-field="checkOut" data-date="${dstr}" value="${isLive ? effData.checkOut : (data.checkOut||'')}" tabindex="${tabOut}">
+              ${monthHasOvertime ? `<span class="ot10-badge">${c.after10pmMin>0 ? `+${formatHoursDecimal(c.after10pmMin)}시간` : ''}</span>` : ''}
+            </div>
+          </td>
           <td>${c.overtimeEligible ? `<input type="checkbox" data-field="overtime" data-date="${dstr}" ${data.overtime ? 'checked' : ''}>` : ''}</td>
           <td class="mono">${c.dur!=null ? minToStr(c.dur) : ''}</td>
           <td class="mono">${c.dur!=null ? minToStr(c.lunch) : ''}</td>
@@ -1447,7 +1572,8 @@
                 <tr>
                   <td colspan="2" class="label-cell">합계</td>
                   <td class="mono">${minToStr(totals.plan)}</td>
-                  <td colspan="2"></td>
+                  <td></td>
+                  <td><div class="checkout-cell">${totals.after10pm>0 ? `<span class="ot10-badge">+${formatHoursDecimal(totals.after10pm)}시간</span>` : ''}</div></td>
                   <td></td>
                   <td class="mono">${minToStr(totals.dur)}</td>
                   <td class="mono">${minToStr(totals.lunch)}</td>
@@ -2449,6 +2575,7 @@
     const session = loadSession();
     if(session && session.id){
       state.user = session;
+      if(session.id === 'local-admin') supabase = createMockSupabaseClient();
       await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
     }
     render();
