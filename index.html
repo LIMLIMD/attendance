@@ -112,7 +112,9 @@
   tbody tr:hover{background:var(--surface3);}
   tbody tr.weekend-sat .date-cell{color:var(--sat);font-weight:700;}
   tbody tr.weekend-sun .date-cell{color:var(--sun);font-weight:700;}
-  .date-cell{font-weight:600;}
+  .date-cell{font-weight:600;white-space:nowrap;width:100px;display:grid;grid-template-columns:24px 1fr 24px;align-items:center;}
+  .date-cell .date-text{text-align:center;}
+  .date-cell .family-tag{justify-self:start;}
 
   input[type=text]:not(.time-input), input[type=password], input[type=number], input[type=date],
   input[type=datetime-local], input[type=search], select:not(.leave-input), textarea{
@@ -125,8 +127,9 @@
   }
   select.leave-input{width:82px;}
   input.time-input{width:78px;}
-  .checkout-cell{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;}
-  .ot10-badge{font-size:8.5px;color:var(--muted3);font-weight:700;white-space:nowrap;flex-shrink:0;display:inline-block;width:32px;text-align:left;}
+  .checkout-cell{display:grid;grid-template-columns:36px auto 36px;align-items:center;white-space:nowrap;}
+  .checkout-cell .ot10-badge{justify-self:start;margin-left:4px;}
+  .ot10-badge{font-size:8.5px;color:var(--muted3);font-weight:700;white-space:nowrap;flex-shrink:0;}
 
   /* ---- 요일별 방문자 수 그래프 ---- */
   .visitor-chart{display:flex;align-items:flex-end;justify-content:space-between;gap:4px;margin-top:14px;}
@@ -535,7 +538,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v26.7.1.2';
+  const APP_VERSION = 'v26.7.1.5';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -1575,7 +1578,7 @@
 
       rows.push(`
         <tr class="${rowClass}" data-date="${dstr}">
-          <td class="date-cell mono">${d}일(${weekdayLabel})${famDay ? ' <span class="family-tag">FD</span>' : ''}</td>
+          <td class="date-cell mono"><span></span><span class="date-text">${d}일(${weekdayLabel})</span>${famDay ? '<span class="family-tag">FD</span>' : '<span></span>'}</td>
           <td>
             <select class="leave-input" data-field="leave" data-date="${dstr}" tabindex="-1">
               ${Object.keys(LEAVE_MIN).map(k=>`<option value="${k}" ${data.leave===k?'selected':''}>${LEAVE_LABEL[k]}</option>`).join('')}
@@ -1585,8 +1588,9 @@
           <td><input class="time-input" type="text" inputmode="numeric" placeholder="09:00" maxlength="5" data-field="checkIn" data-date="${dstr}" value="${data.checkIn||''}" tabindex="${tabIn}"></td>
           <td>
             <div class="checkout-cell">
+              <span></span>
               <input class="time-input${isLive ? ' live-preview' : ''}" type="text" inputmode="numeric" placeholder="18:00" maxlength="5" data-field="checkOut" data-date="${dstr}" value="${isLive ? effData.checkOut : (data.checkOut||'')}" tabindex="${tabOut}">
-              ${monthHasOvertime ? `<span class="ot10-badge">${c.after10pmMin>0 ? `+${formatHoursDecimal(c.after10pmMin)}시간` : ''}</span>` : ''}
+              <span class="ot10-badge">${c.after10pmMin>0 ? `+${formatHoursDecimal(c.after10pmMin)}시간` : ''}</span>
             </div>
           </td>
           <td>${c.overtimeEligible ? `<input type="checkbox" data-field="overtime" data-date="${dstr}" ${data.overtime ? 'checked' : ''}>` : ''}</td>
@@ -1642,7 +1646,7 @@
                   <td colspan="2" class="label-cell">합계</td>
                   <td class="mono">${minToStr(totals.plan)}</td>
                   <td></td>
-                  <td><div class="checkout-cell">${totals.after10pm>0 ? `<span class="ot10-badge">+${formatHoursDecimal(totals.after10pm)}시간</span>` : ''}</div></td>
+                  <td>${totals.after10pm>0 ? `<span class="ot10-badge" style="width:auto;">+${formatHoursDecimal(totals.after10pm)}시간</span>` : ''}</td>
                   <td></td>
                   <td class="mono">${minToStr(totals.dur)}</td>
                   <td class="mono">${minToStr(totals.lunch)}</td>
