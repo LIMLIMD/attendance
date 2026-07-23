@@ -67,6 +67,8 @@
   html{background:var(--paper);}
   body,#app{margin:0;color:var(--ink);background:var(--paper);}
   body{min-height:100vh;min-height:100dvh;}
+  body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+  input, textarea, select{-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default;}
   .mono{font-family:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;font-variant-numeric:tabular-nums;}
 
   #app{background:var(--paper);padding:20px;min-height:100vh;min-height:100dvh;}
@@ -533,7 +535,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v26.7.1.1';
+  const APP_VERSION = 'v26.7.1.2';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
