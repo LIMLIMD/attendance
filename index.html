@@ -125,6 +125,19 @@
   input.time-input{width:78px;}
   .checkout-cell{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;}
   .ot10-badge{font-size:8.5px;color:var(--muted3);font-weight:700;white-space:nowrap;flex-shrink:0;display:inline-block;width:32px;text-align:left;}
+
+  /* ---- 요일별 방문자 수 그래프 ---- */
+  .visitor-chart{display:flex;align-items:flex-end;justify-content:space-between;gap:4px;margin-top:14px;}
+  .visitor-bar-col{display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;}
+  .visitor-bar-count{font-size:10.5px;font-weight:700;color:var(--text2);margin-bottom:3px;}
+  .visitor-bar-track{width:100%;max-width:24px;height:64px;display:flex;align-items:flex-end;background:var(--surface2);border-radius:4px;overflow:hidden;}
+  .visitor-bar-fill{width:100%;background:var(--muted5);border-radius:4px 4px 0 0;min-height:0;transition:height .2s ease;}
+  .visitor-bar-fill.today{background:var(--accent);}
+  .visitor-bar-label{font-size:9.5px;color:var(--muted3);margin-top:5px;text-align:center;line-height:1.3;font-weight:600;}
+  .visitor-bar-label.today{color:var(--accent);font-weight:700;}
+  .visitor-cumulative{text-align:right;margin-top:12px;}
+  .visitor-cumulative .num{font-size:13px;font-weight:800;color:var(--ink);}
+  .visitor-cumulative .lbl{font-size:10px;color:var(--muted3);font-weight:600;margin-right:4px;}
   input.time-input.invalid{border-color:var(--minus);background:var(--danger-bg);}
   select.leave-input:hover, input.time-input:hover{background:var(--input-bg-hover);}
   select.leave-input:focus, input.time-input:focus{outline:2px solid var(--accent);outline-offset:1px;}
@@ -436,7 +449,8 @@
       todo_categories: [{ id: genMockId(), user_id: uid, name: '업무', sort_order: 0, color: '#2B5FAD' }],
       todo_items: [],
       calendar_events: [],
-      notepads: []
+      notepads: [],
+      app_visits: []
     };
     saveMockDb();
   }
@@ -519,7 +533,7 @@
   const LEAVE_MIN = { none:0, full:480, half:240, quarter:120, holiday:0 };
   const LEAVE_LABEL = { none:'없음', full:'연차', half:'반차', quarter:'반반차', holiday:'공휴일' };
   const MEAL_RATE = 9000;
-  const APP_VERSION = 'v26.7.0.3';
+  const APP_VERSION = 'v26.7.1.1';
   const RULE_LINES = [
     '점심휴게: 평일은 기존과 동일하게 11:30~12:30 중 근무한 만큼만 차감(체류시간과 무관), 주말/공휴일은 체류시간 4:30 이상이면 30분·9:00 이상이면 1시간 자동 차감',
     `저녁휴게: 체류시간 11:30 이상이면 30분 추가 차감 (저녁식대 ₩${MEAL_RATE.toLocaleString()} 고정 지급)`,
@@ -547,6 +561,7 @@
     calendarYear: 2026, calendarMonth: 7, calendarSelectedDate: '', calendarEvents: [], calendarEventEditing: null,
     calendarAddFormOpen: false,
     colorSettingsOpen: false,
+    visitAllRows: [],
     todoPanelWidth: 340,
     pastePending: [],
     calendarCategoryFilter: null, // null = 전체, 아니면 category id
@@ -1204,6 +1219,20 @@
 
   const NOTE_AUTO_DELETE_DAYS = 15;
 
+  async function recordVisit(){
+    if(!supabase || !state.user) return;
+    const todayKey = dateKey(todayObj.getFullYear(), todayObj.getMonth()+1, todayObj.getDate());
+    try{
+      await supabase.from('app_visits').upsert({ user_id: state.user.id, date_key: todayKey }, { onConflict: 'user_id,date_key' });
+    }catch(e){}
+  }
+  async function loadVisitStats(){
+    state.visitAllRows = [];
+    if(!supabase || !state.user) return;
+    const { data } = await supabase.from('app_visits').select('date_key');
+    state.visitAllRows = data || [];
+  }
+
   async function loadNotepads(){
     state.notepads = [];
     if(!supabase || !state.user) return;
@@ -1350,7 +1379,8 @@
       const res = await login(nameEl.value.trim(), pinEl.value.trim());
       if(res.ok){
         state.user = res.user; state.loginError=''; saveSession(res.user);
-        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
+        await recordVisit();
+        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads(), loadVisitStats()]);
         render();
       } else {
         // 화면 전체를 다시 그리지 않고 PIN만 지워서 이름은 그대로 유지
@@ -1394,7 +1424,8 @@
       const res = await register(nameEl.value.trim(), pinEl.value.trim(), pinConfirmEl.value.trim());
       if(res.ok){
         state.user = res.user; state.signupError=''; saveSession(res.user);
-        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
+        await recordVisit();
+        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads(), loadVisitStats()]);
         render();
       } else { state.signupError = res.message; btn.disabled=false; btn.textContent='회원가입'; render(); }
     }
@@ -1431,7 +1462,8 @@
       const res = await changePin(nameEl.value.trim(), oldPinEl.value.trim(), newPinEl.value.trim(), newPinConfirmEl.value.trim());
       if(res.ok){
         state.user = res.user; state.changePinError=''; saveSession(res.user);
-        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
+        await recordVisit();
+        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads(), loadVisitStats()]);
         render();
       } else { state.changePinError = res.message; btn.disabled=false; btn.textContent='PIN 변경'; render(); }
     }
@@ -1466,6 +1498,41 @@
       <div class="paste-hint">"연장" 체크박스는 퇴근이 22:00을 넘는 날에만 나타나요. 체크해야 22:00 이후 시간까지 근무로 인정됩니다.</div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn-primary" id="pasteApplyBtn">선택한 항목 적용 (${state.pastePending.filter(r=>r.include).length}건)</button>
+      </div>
+    `;
+  }
+
+  function computeVisitorChartData(){
+    const rows = state.visitAllRows || [];
+    const countByDate = {};
+    rows.forEach(r=>{ countByDate[r.date_key] = (countByDate[r.date_key]||0) + 1; });
+    const days = [];
+    for(let i=6; i>=0; i--){
+      const d = new Date(todayObj.getFullYear(), todayObj.getMonth(), todayObj.getDate() - i);
+      const dk = dateKey(d.getFullYear(), d.getMonth()+1, d.getDate());
+      days.push({ date: dk, day: d.getDate(), dow: DOW_LABEL[d.getDay()], count: countByDate[dk] || 0 });
+    }
+    return { days, cumulativeTotal: rows.length };
+  }
+  function renderVisitorChart(){
+    const { days, cumulativeTotal } = computeVisitorChartData();
+    const maxCount = Math.max(1, ...days.map(d=>d.count));
+    const barsHtml = days.map(d=>{
+      const heightPct = d.count > 0 ? Math.max(8, Math.round((d.count / maxCount) * 100)) : 0;
+      const isToday = d.date === dateKey(todayObj.getFullYear(), todayObj.getMonth()+1, todayObj.getDate());
+      return `
+        <div class="visitor-bar-col">
+          <div class="visitor-bar-count">${d.count}</div>
+          <div class="visitor-bar-track"><div class="visitor-bar-fill${isToday ? ' today' : ''}" style="height:${heightPct}%;"></div></div>
+          <div class="visitor-bar-label${isToday ? ' today' : ''}">${d.dow}<br>${d.day}</div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="card" style="margin-top:16px;">
+        <h2>요일별 방문자 수</h2>
+        <div class="visitor-chart">${barsHtml}</div>
+        <div class="visitor-cumulative"><span class="lbl">누적 방문자 수</span><span class="num">${cumulativeTotal}</span></div>
       </div>
     `;
   }
@@ -1608,6 +1675,7 @@
             <h2>규칙</h2>
             <div class="legend">${RULE_LINES.map(l=>`<div class="legend-line">· ${l}</div>`).join('')}</div>
           </div>
+          ${renderVisitorChart()}
         </div>
       </div>
     `;
@@ -2576,7 +2644,8 @@
     if(session && session.id){
       state.user = session;
       if(session.id === 'local-admin') supabase = createMockSupabaseClient();
-      await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads()]);
+      await recordVisit();
+        await Promise.all([loadMonth(), loadTodos(), loadCalendarEvents(), loadNotepads(), loadVisitStats()]);
     }
     render();
   })();
